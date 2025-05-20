@@ -1,0 +1,300 @@
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_typography.dart';
+import '../../core/utils/responsive.dart';
+import '../../core/utils/snackbar_utils.dart';
+import '../../providers/user_provider.dart';
+import '../../services/api_service.dart';
+import '../../widgets/custom_app_bar.dart';
+
+class ApplyLeaveScreen extends StatefulWidget {
+  const ApplyLeaveScreen({Key? key}) : super(key: key);
+
+  @override
+  State<ApplyLeaveScreen> createState() => _ApplyLeaveScreenState();
+}
+
+class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
+  final _formKey = GlobalKey<FormState>();
+  bool _isLoading = false;
+
+  String? _leaveType;
+  String? _duration;
+  DateTime? _startDate;
+  DateTime? _endDate;
+  String? _reason;
+  TimeOfDay? _earlyOffStartTime;
+  TimeOfDay? _earlyOffEndTime;
+
+  final List<String> _leaveTypes = ['Sick', 'Casual', 'Paid'];
+  final List<String> _durations = ['Full Day', 'Half Day','Early Off'];
+
+  Future<void> _pickDate(BuildContext context, bool isStart) async {
+    final initialDate = isStart ? (_startDate ?? DateTime.now()) : (_endDate ?? _startDate ?? DateTime.now());
+    final firstDate = isStart ? DateTime.now() : (_startDate ?? DateTime.now());
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: firstDate,
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) {
+      setState(() {
+        if (isStart) {
+          _startDate = picked;
+          if (_endDate != null && _endDate!.isBefore(_startDate!)) {
+            _endDate = _startDate;
+          }
+        } else {
+          _endDate = picked;
+        }
+      });
+    }
+  }
+
+  Future<void> _pickTime(BuildContext context, bool isStart) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+    );
+    if (picked != null) {
+      setState(() {
+        if (isStart) {
+          _earlyOffStartTime = picked;
+        } else {
+          _earlyOffEndTime = picked;
+        }
+      });
+    }
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_leaveType == null || _duration == null || _startDate == null || _endDate == null) {
+      SnackBarUtils.showError(context, 'Please fill all required fields.');
+      return;
+    }
+    setState(() => _isLoading = true);
+    _formKey.currentState!.save();
+    try {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final user = userProvider.user;
+      if (user == null) throw Exception('User not found');
+      await ApiService().applyForLeave(
+        context: context,
+        apiToken: user.data.apiToken,
+        leaveType: _leaveType!,
+        duration: _duration!,
+        startDate: DateFormat('yyyy-MM-dd').format(_startDate!),
+        endDate: DateFormat('yyyy-MM-dd').format(_endDate!),
+        reason: _reason ?? '',
+        earlyOffStartTime: _duration == 'Early Off' && _earlyOffStartTime != null ? _earlyOffStartTime!.format(context) : null,
+        earlyOffEndTime: _duration == 'Early Off' && _earlyOffEndTime != null ? _earlyOffEndTime!.format(context) : null,
+      );
+      SnackBarUtils.showSuccess(context, 'Leave applied successfully!');
+      Navigator.of(context).pop();
+    } catch (e) {
+      SnackBarUtils.showError(context, e.toString());
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: CustomAppBar(
+        title: 'Apply Leave',
+        onMenuPressed: () => Navigator.of(context).pop(),
+        showProfilePicture: false,
+        showNotification: false,
+      ),
+      body: SingleChildScrollView(
+        padding: EdgeInsets.symmetric(
+          horizontal: Responsive.responsiveValue(context: context, mobile: 16, tablet: 32),
+          vertical: 24,
+        ),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Leave Type', style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: _leaveType,
+                items: _leaveTypes.map((type) => DropdownMenuItem(value: type, child: Text(type))).toList(),
+                onChanged: (val) => setState(() => _leaveType = val),
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                ),
+                validator: (val) => val == null ? 'Required' : null,
+              ),
+              const SizedBox(height: 16),
+              Text('Duration', style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: _duration,
+                items: _durations.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+                onChanged: (val) => setState(() => _duration = val),
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                ),
+                validator: (val) => val == null ? 'Required' : null,
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Start Date', style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        GestureDetector(
+                          onTap: () => _pickDate(context, true),
+                          child: AbsorbPointer(
+                            child: TextFormField(
+                              decoration: InputDecoration(
+                                border: OutlineInputBorder(),
+                                hintText: 'Select',
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              ),
+                              controller: TextEditingController(
+                                text: _startDate != null ? DateFormat('dd MMM yyyy').format(_startDate!) : '',
+                              ),
+                              validator: (val) => _startDate == null ? 'Required' : null,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('End Date', style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        GestureDetector(
+                          onTap: () => _pickDate(context, false),
+                          child: AbsorbPointer(
+                            child: TextFormField(
+                              decoration: InputDecoration(
+                                border: OutlineInputBorder(),
+                                hintText: 'Select',
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              ),
+                              controller: TextEditingController(
+                                text: _endDate != null ? DateFormat('dd MMM yyyy').format(_endDate!) : '',
+                              ),
+                              validator: (val) => _endDate == null ? 'Required' : null,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text('Reason', style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              TextFormField(
+                maxLines: 3,
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(),
+                  hintText: 'Enter reason',
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                ),
+                onSaved: (val) => _reason = val,
+                validator: (val) => (val == null || val.trim().isEmpty) ? 'Required' : null,
+              ),
+              if (_duration == 'Early Off') ...[
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Early Off Start Time', style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 8),
+                          GestureDetector(
+                            onTap: () => _pickTime(context, true),
+                            child: AbsorbPointer(
+                              child: TextFormField(
+                                decoration: InputDecoration(
+                                  border: OutlineInputBorder(),
+                                  hintText: 'Select',
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                ),
+                                controller: TextEditingController(
+                                  text: _earlyOffStartTime != null ? _earlyOffStartTime!.format(context) : '',
+                                ),
+                                validator: (val) => _earlyOffStartTime == null ? 'Required' : null,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Early Off End Time', style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 8),
+                          GestureDetector(
+                            onTap: () => _pickTime(context, false),
+                            child: AbsorbPointer(
+                              child: TextFormField(
+                                decoration: InputDecoration(
+                                  border: OutlineInputBorder(),
+                                  hintText: 'Select',
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                ),
+                                controller: TextEditingController(
+                                  text: _earlyOffEndTime != null ? _earlyOffEndTime!.format(context) : '',
+                                ),
+                                validator: (val) => _earlyOffEndTime == null ? 'Required' : null,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _submit,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    textStyle: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  child: _isLoading
+                      ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text('Apply'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+} 
