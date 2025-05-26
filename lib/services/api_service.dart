@@ -35,6 +35,52 @@ class ApiService {
     });
   }
 
+  Future<UserModel> login(String mobile, String password) async {
+    try {
+      if (mobile.isEmpty) {
+        throw ApiException('Mobile number is required');
+      }
+      if (password.isEmpty) {
+        throw ApiException('Password is required');
+      }
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/login'),
+        body: {
+          'mobile': mobile,
+          'password': password,
+        },
+      );
+
+      final Map<String, dynamic> data = json.decode(response.body);
+
+      // Check for API error response
+      if (data['status'] == 0) {
+        throw ApiException(data['message'] ?? 'Login failed');
+      }
+
+      if (response.statusCode == 200) {
+        return UserModel.fromJson(data);
+      } else if (response.statusCode == 401) {
+        throw ApiException('Invalid credentials');
+      } else if (response.statusCode == 403) {
+        throw ApiException('Account is locked. Please contact support.');
+      } else if (response.statusCode == 429) {
+        throw ApiException('Too many login attempts. Please try again later.');
+      } else {
+        throw ApiException('Server error occurred. Please try again later.',
+            statusCode: response.statusCode);
+      }
+    } on FormatException {
+      throw ApiException('Invalid response from server');
+    } on http.ClientException {
+      throw ApiException('Network error. Please check your internet connection.');
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('An unexpected error occurred. Please try again.');
+    }
+  }
+
   Future<List<Designation>> getDesignations() async {
     try {
       final response = await http.get(Uri.parse('$baseUrl/getDesignations'));
@@ -65,51 +111,7 @@ class ApiService {
     }
   }
 
-  Future<UserModel> login(String mobile, String password) async {
-    try {
-      if (mobile.isEmpty) {
-        throw ApiException('Mobile number is required');
-      }
-      if (password.isEmpty) {
-        throw ApiException('Password is required');
-      }
 
-      final response = await http.post(
-        Uri.parse('$baseUrl/login'),
-        body: {
-          'mobile': mobile,
-          'password': password,
-        },
-      );
-
-      final Map<String, dynamic> data = json.decode(response.body);
-      
-      // Check for API error response
-      if (data['status'] == 0) {
-        throw ApiException(data['message'] ?? 'Login failed');
-      }
-
-      if (response.statusCode == 200) {
-        return UserModel.fromJson(data);
-      } else if (response.statusCode == 401) {
-        throw ApiException('Invalid credentials');
-      } else if (response.statusCode == 403) {
-        throw ApiException('Account is locked. Please contact support.');
-      } else if (response.statusCode == 429) {
-        throw ApiException('Too many login attempts. Please try again later.');
-      } else {
-        throw ApiException('Server error occurred. Please try again later.', 
-          statusCode: response.statusCode);
-      }
-    } on FormatException {
-      throw ApiException('Invalid response from server');
-    } on http.ClientException {
-      throw ApiException('Network error. Please check your internet connection.');
-    } catch (e) {
-      if (e is ApiException) rethrow;
-      throw ApiException('An unexpected error occurred. Please try again.');
-    }
-  }
 
   Future<UserModel> signup({
     required BuildContext context,
@@ -794,6 +796,7 @@ class ApiService {
     required String reason,
     String? earlyOffStartTime,
     String? earlyOffEndTime,
+    String? halfDaySession,
   }) async {
     try {
       final body = {
@@ -806,6 +809,7 @@ class ApiService {
       };
       if (earlyOffStartTime != null) body['early_off_start_time'] = earlyOffStartTime;
       if (earlyOffEndTime != null) body['early_off_end_time'] = earlyOffEndTime;
+      if (halfDaySession != null) body['half_day_session'] = halfDaySession;
       final response = await http.post(
         Uri.parse('$baseUrl/applyForLeave'),
         body: body,
@@ -829,4 +833,179 @@ class ApiService {
       throw ApiException('An unexpected error occurred while applying for leave.');
     }
   }
+
+  Future<void> cancelLeaveRequest({
+    required BuildContext context,
+    required String apiToken,
+    required String leaveId,
+  }) async {
+    try {
+      final body = {
+        'api_token': apiToken,
+        'leave_id': leaveId,
+      };
+      final response = await http.post(
+        Uri.parse('$baseUrl/cancelLeave'),
+        body: body,
+      );
+      if (response.statusCode == 401) {
+        _handleSessionExpired(context);
+        throw ApiException('Session expired');
+      }
+      final Map<String, dynamic> data = json.decode(response.body);
+      if (response.statusCode == 200 && data['status'] == 1) {
+        return;
+      } else {
+        throw ApiException(data['message'] ?? 'Failed to cancel request');
+      }
+    } on FormatException {
+      throw ApiException('Invalid response from server');
+    } on http.ClientException {
+      throw ApiException('Network error. Please check your internet connection.');
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('An unexpected error occurred while cancelling request.');
+    }
+  }
+
+  Future<void> applyForEmployeeExpense({
+    required BuildContext context,
+    required String apiToken,
+    required String title,
+    required String amount,
+    required String description,
+    required String expenseDate,
+    required List<dynamic> images, // List<XFile>
+  }) async {
+    try {
+      var request = http.MultipartRequest('POST', Uri.parse('$baseUrl/applyForEmployeeExpense'));
+      request.fields['api_token'] = apiToken;
+      request.fields['title'] = title;
+      request.fields['amount'] = amount;
+      request.fields['description'] = description;
+      request.fields['expense_date'] = expenseDate;
+      for (var img in images) {
+        request.files.add(await http.MultipartFile.fromPath('images[]', img.path));
+      }
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
+      if (response.statusCode == 401) {
+        _handleSessionExpired(context);
+        throw ApiException('Session expired');
+      }
+      final Map<String, dynamic> data = json.decode(response.body);
+      if (response.statusCode == 200 && data['status'] == 1) {
+        return;
+      } else {
+        throw ApiException(data['message'] ?? 'Failed to apply for expense');
+      }
+    } on FormatException {
+      throw ApiException('Invalid response from server');
+    } on http.ClientException {
+      throw ApiException('Network error. Please check your internet connection.');
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('An unexpected error occurred while applying for expense.');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getEmployeeExpenseList({
+    required BuildContext context,
+    required String apiToken,
+    String? userId, // null for admin (all users)
+  }) async {
+    final body = {
+      'api_token': apiToken,
+    };
+    if (userId != null) body['user_id'] = userId;
+    final response = await http.post(
+      Uri.parse('$baseUrl/employeeExpenseList'),
+      body: body,
+    );
+    if (response.statusCode == 401) {
+      _handleSessionExpired(context);
+      throw ApiException('Session expired');
+    }
+    final Map<String, dynamic> data = json.decode(response.body);
+    if (response.statusCode == 200 && data['status'] == 1 && data['data'] is List) {
+      return List<Map<String, dynamic>>.from(data['data']);
+    } else {
+      throw ApiException(data['message'] ?? 'Failed to fetch expense list');
+    }
+  }
+
+  Future<void> employeeExpenseRequestAction({
+    required BuildContext context,
+    required String apiToken,
+    required String expenseId,
+    required String status,
+    String? reason,
+  }) async {
+    try {
+      final body = {
+        'api_token': apiToken,
+        'employee_expense_id': expenseId,
+        'status': status,
+      };
+      if (reason != null && reason.isNotEmpty) {
+        body['admin_reason'] = reason;
+      }
+      final response = await http.post(
+        Uri.parse('$baseUrl/employeeExpenseRequestAction'),
+        body: body,
+      );
+      if (response.statusCode == 401) {
+        _handleSessionExpired(context);
+        throw ApiException('Session expired');
+      }
+      final Map<String, dynamic> data = json.decode(response.body);
+      if (response.statusCode == 200 && data['status'] == 1) {
+        return;
+      } else {
+        throw ApiException(data['message'] ?? 'Failed to update expense request');
+      }
+    } on FormatException {
+      throw ApiException('Invalid response from server');
+    } on http.ClientException {
+      throw ApiException('Network error. Please check your internet connection.');
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('An unexpected error occurred while updating expense request.');
+    }
+  }
+
+  Future<void> employeeExpenseCancel({
+    required BuildContext context,
+    required String apiToken,
+    required String expenseId,
+  }) async {
+    try {
+      final body = {
+        'api_token': apiToken,
+        'employee_expense_id': expenseId,
+      };
+      final response = await http.post(
+        Uri.parse('$baseUrl/employeeExpenseCancel'),
+        body: body,
+      );
+      if (response.statusCode == 401) {
+        _handleSessionExpired(context);
+        throw ApiException('Session expired');
+      }
+      final Map<String, dynamic> data = json.decode(response.body);
+      if (response.statusCode == 200 && data['status'] == 1) {
+        return;
+      } else {
+        throw ApiException(data['message'] ?? 'Failed to cancel expense request');
+      }
+    } on FormatException {
+      throw ApiException('Invalid response from server');
+    } on http.ClientException {
+      throw ApiException('Network error. Please check your internet connection.');
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('An unexpected error occurred while cancelling expense request.');
+    }
+  }
+
 } 

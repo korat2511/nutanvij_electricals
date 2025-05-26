@@ -71,13 +71,6 @@ class SnackBarUtils {
       ),
       margin: const EdgeInsets.all(16),
       duration: const Duration(seconds: 3),
-      // action: SnackBarAction(
-      //   label: 'Dismiss',
-      //   textColor: Colors.white,
-      //   onPressed: () {
-      //     ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      //   },
-      // ),
     );
 
     ScaffoldMessenger.of(context)

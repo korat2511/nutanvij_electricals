@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:nutanvij_electricals/screens/splash_screen.dart';
 import 'package:provider/provider.dart';
 import 'providers/user_provider.dart';
-import 'screens/auth/login_screen.dart';
 
 void main() {
   runApp(const MyApp());

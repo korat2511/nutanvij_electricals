@@ -3,7 +3,6 @@ import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:nutanvij_electricals/screens/auth/login_screen.dart';
-import 'package:nutanvij_electricals/screens/auth/signup_screen.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_typography.dart';
 import '../core/utils/responsive.dart';

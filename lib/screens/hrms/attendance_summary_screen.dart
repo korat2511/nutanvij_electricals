@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:nutanvij_electricals/core/utils/navigation_utils.dart';
 import 'package:nutanvij_electricals/screens/hrms/all_user_attendance_screen.dart';
+import 'package:nutanvij_electricals/screens/hrms/expense_request_list_screen.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import 'package:intl/intl.dart';
@@ -15,6 +16,8 @@ import '../../core/utils/snackbar_utils.dart';
 import '../../core/constants/user_access.dart';
 
 import '../../widgets/custom_app_bar.dart';
+import '../../widgets/custom_button.dart';
+import 'apply_leave_screen.dart';
 import 'edit_attendance_request_list_screen.dart';
 import 'holiday_calendar_screen.dart';
 import 'leave_request_list_screen.dart';
@@ -353,6 +356,19 @@ class _AttendanceSummaryScreenState extends State<AttendanceSummaryScreen>
                                       const LeaveRequestListScreen(isAllUsers: true));
                                 },
                               ),
+                              ListTile(
+                                leading: const Icon(Icons.attach_money,
+                                    color: AppColors.primary),
+                                title: const Text('Expenses Requests'),
+                                onTap: () {
+                                  Navigator.pop(ctx);
+                                  NavigationUtils.push(
+                                      context,
+                                      const ExpenseRequestListScreen(isAllUsers: true));
+                                },
+                              ),
+
+
                             ],
                           ),
                         );
@@ -405,10 +421,14 @@ class _AttendanceSummaryScreenState extends State<AttendanceSummaryScreen>
               controller: _tabController,
               children: [
                 _buildSummaryTab(context),
-                const HolidayCalendarScreen(),
-                Center(
-                    child:
-                        Text('All Payment', style: AppTypography.titleLarge)),
+                // const HolidayCalendarScreen(),
+                  const LeaveRequestListScreen(isAllUsers: false),
+
+                ExpenseRequestListScreen()
+
+                // Center(
+                //     child:
+                //         Text('All Payment', style: AppTypography.titleLarge)),
               ],
             ),
           ),

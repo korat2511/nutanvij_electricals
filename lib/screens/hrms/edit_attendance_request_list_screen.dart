@@ -68,7 +68,8 @@ class _EditAttendanceRequestListScreenState
         userId: widget.isAllUsers ? '' : user.data.id.toString(),
       );
       // Fetch attendance change requests
-      final attendanceChangeRequests = await ApiService().getAttendanceRequestList(
+      final attendanceChangeRequests =
+          await ApiService().getAttendanceRequestList(
         context: context,
         apiToken: user.data.apiToken,
         startDate: startDate,
@@ -105,9 +106,13 @@ class _EditAttendanceRequestListScreenState
         search: '',
       );
       final designationId = user.data.designationId;
-      List<Map<String, dynamic>> filteredUsers = List<Map<String, dynamic>>.from(users);
+      List<Map<String, dynamic>> filteredUsers =
+          List<Map<String, dynamic>>.from(users);
       if (!UserAccess.hasAdminAccess(designationId)) {
-        filteredUsers = filteredUsers.where((u) => UserAccess.isBelow(designationId, u['designation_id'])).toList();
+        filteredUsers = filteredUsers
+            .where(
+                (u) => UserAccess.isBelow(designationId, u['designation_id']))
+            .toList();
       }
       setState(() {
         _users = filteredUsers;
@@ -131,9 +136,10 @@ class _EditAttendanceRequestListScreenState
               '')
           : '';
       final approvedByValue = req['approved_by'];
-      final approvedByName = (approvedByValue is Map && approvedByValue['name'] != null)
-          ? approvedByValue['name'].toString().toLowerCase()
-          : approvedByValue?.toString().toLowerCase() ?? '';
+      final approvedByName =
+          (approvedByValue is Map && approvedByValue['name'] != null)
+              ? approvedByValue['name'].toString().toLowerCase()
+              : approvedByValue?.toString().toLowerCase() ?? '';
       final matchesStatus = _selectedStatus == 'all' ||
           _selectedStatus.isEmpty ||
           status == _selectedStatus;
@@ -146,7 +152,9 @@ class _EditAttendanceRequestListScreenState
           approvedByName.contains(_approvedBy!.toLowerCase());
       // Only show requests from users with a lower designation for non-admins
       if (widget.isAllUsers && !UserAccess.hasAdminAccess(designationId)) {
-        final requestorDesignationId = req['attendance']?['user']?['designation_id'] ?? req['user']?['designation_id'];
+        final requestorDesignationId = req['attendance']?['user']
+                ?['designation_id'] ??
+            req['user']?['designation_id'];
         if (!UserAccess.isBelow(designationId, requestorDesignationId)) {
           return false;
         }
@@ -496,26 +504,31 @@ class _EditAttendanceRequestListScreenState
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: IconButton(
-                    icon: const Icon(Icons.filter_alt_outlined,
-                        color: AppColors.primary),
-                    onPressed: _openFilterDrawer,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: Responsive.responsiveValue(
+                            context: context, mobile: 16, tablet: 32),
+                      ),
+                      child: Text(
+                        isAllUsers ? 'All User\'s Requests' : 'My Requests',
+                        style: AppTypography.titleMedium
+                            .copyWith(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: IconButton(
+                        icon: const Icon(Icons.filter_alt_outlined,
+                            color: AppColors.primary),
+                        onPressed: _openFilterDrawer,
+                      ),
+                    ),
+                  ],
                 ),
-                Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: Responsive.responsiveValue(
-                        context: context, mobile: 16, tablet: 32),
-                  ),
-                  child: Text(
-                    isAllUsers ? 'All User\'s Requests' : 'My Requests',
-                    style: AppTypography.titleMedium
-                        .copyWith(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                const SizedBox(height: 10,),
                 Expanded(
                   child: _filteredRequests.isEmpty
                       ? Center(
@@ -538,7 +551,8 @@ class _EditAttendanceRequestListScreenState
                             final req = _filteredRequests[i];
                             final status = (req['status'] ?? '').toString();
                             final type = (req['type'] ?? '').toString();
-                            final requestedTime =  (req['time'] ?? '').toString();
+                            final requestedTime =
+                                (req['time'] ?? '').toString();
                             final reason = (req['reason'] ??
                                     req['check_in_description'] ??
                                     '')
@@ -562,19 +576,22 @@ class _EditAttendanceRequestListScreenState
                                 : null;
 
                             final adminReason = (req['admin_reason'] ??
-                                req['admin_reason'] ??
-                                '')
+                                    req['admin_reason'] ??
+                                    '')
                                 .toString();
 
                             final requestedDateLabel = requestedDate != null
                                 ? DateFormat('dd MMM yyyy, hh:mm a')
                                     .format(requestedDate)
                                 : '';
-                            final attendanceDateLabel = 
-                              attendanceDate != null
-                                ? DateFormat('dd MMM yyyy').format(attendanceDate)
+                            final attendanceDateLabel = attendanceDate != null
+                                ? DateFormat('dd MMM yyyy')
+                                    .format(attendanceDate)
                                 : (req['date'] != null
-                                    ? DateFormat('dd MMM yyyy').format(DateFormat('yyyy-MM-dd').parse(req['date'], true).toLocal())
+                                    ? DateFormat('dd MMM yyyy').format(
+                                        DateFormat('yyyy-MM-dd')
+                                            .parse(req['date'], true)
+                                            .toLocal())
                                     : '-');
                             final approvedDateLabel = approvedDate != null
                                 ? DateFormat('dd MMM yyyy, hh:mm a')
@@ -591,7 +608,8 @@ class _EditAttendanceRequestListScreenState
                               statusColor = Colors.red;
                             }
 
-                            final actualTime =  (req['actual_time'] ?? '').toString();
+                            final actualTime =
+                                (req['actual_time'] ?? '').toString();
 
                             // Extract user name and designation for all users screen
                             String userName = '';
@@ -624,9 +642,12 @@ class _EditAttendanceRequestListScreenState
                               if (status.toLowerCase() == 'pending' &&
                                   UserAccess.hasAdminAccess(designationId)) {
                                 if (requestorId != loggedInUserId) {
-                                  if (UserAccess.hasSeniorEngineerAccess(requestorDesignationId)) {
-                                    canShowAction = designationId == UserAccess.admin;
-                                  } else if (!UserAccess.hasAdminAccess(requestorDesignationId)) {
+                                  if (UserAccess.hasSeniorEngineerAccess(
+                                      requestorDesignationId)) {
+                                    canShowAction =
+                                        designationId == UserAccess.admin;
+                                  } else if (!UserAccess.hasAdminAccess(
+                                      requestorDesignationId)) {
                                     canShowAction = true;
                                   }
                                 }
@@ -646,32 +667,57 @@ class _EditAttendanceRequestListScreenState
                                         'Multi Attendance Request') &&
                                 isAllUsers;
 
-                            final inTime = req['attendance']?['in_time']?.toString() ?? req['in_time']?.toString() ?? '-';
-                            final outTime = req['attendance']?['out_time']?.toString() ?? req['out_time']?.toString() ?? '-';
+                            final inTime =
+                                req['attendance']?['in_time']?.toString() ??
+                                    req['in_time']?.toString() ??
+                                    '-';
+                            final outTime =
+                                req['attendance']?['out_time']?.toString() ??
+                                    req['out_time']?.toString() ??
+                                    '-';
 
                             // Show cancel button for own pending requests
-                            final isOwnRequest = !isAllUsers || (requestorId == loggedInUserId);
+                            final isOwnRequest =
+                                !isAllUsers || (requestorId == loggedInUserId);
                             final isPending = status.toLowerCase() == 'pending';
 
                             return AttendanceRequestCard(
                               name: userName,
-                              designation: UserAccess.getRoleName(requestorDesignationId),
+                              designation: UserAccess.getRoleName(
+                                  requestorDesignationId),
                               status: status,
                               statusColor: statusColor,
                               attendanceDate: attendanceDateLabel,
-                              actualTime: requestType == 'Time Change Request' ? (actualTime.isNotEmpty ? actualTime : '-') : null,
-                              requestedTime: requestType == 'Time Change Request' ? (requestedTime.isNotEmpty ? requestedTime : '-') : null,
-                              inTime: requestType == 'Multi Attendance Request' ? inTime : null,
-                              outTime: requestType == 'Multi Attendance Request' ? outTime : null,
+                              actualTime: requestType == 'Time Change Request'
+                                  ? (actualTime.isNotEmpty ? actualTime : '-')
+                                  : null,
+                              requestedTime:
+                                  requestType == 'Time Change Request'
+                                      ? (requestedTime.isNotEmpty
+                                          ? requestedTime
+                                          : '-')
+                                      : null,
+                              inTime: requestType == 'Multi Attendance Request'
+                                  ? inTime
+                                  : null,
+                              outTime: requestType == 'Multi Attendance Request'
+                                  ? outTime
+                                  : null,
                               requestedOn: requestedDateLabel,
                               reason: reason.isNotEmpty ? reason : '-',
-                              adminReason: adminReason.isNotEmpty ? adminReason : '-',
+                              adminReason:
+                                  adminReason.isNotEmpty ? adminReason : '-',
                               requestType: requestType,
-                              approvedBy: (req['approved_by'] is Map && req['approved_by']?['name'] != null)
-                                ? req['approved_by']['name'].toString()
-                                : req['approved_by']?.toString() ?? '-',
+                              approvedBy: (req['approved_by'] is Map &&
+                                      req['approved_by']?['name'] != null)
+                                  ? req['approved_by']['name'].toString()
+                                  : req['approved_by']?.toString() ?? '-',
                               approvedOn: approvedDateLabel,
-                              attendanceType: (type == 'check_in') ? 'CHECK IN' : (type == 'check_out') ? 'CHECK OUT' : '',
+                              attendanceType: (type == 'check_in')
+                                  ? 'CHECK IN'
+                                  : (type == 'check_out')
+                                      ? 'CHECK OUT'
+                                      : '',
                               showActions: showActionButtons,
                               showCancel: isOwnRequest && isPending,
                               onCancel: isOwnRequest && isPending
@@ -680,30 +726,52 @@ class _EditAttendanceRequestListScreenState
                                         context: context,
                                         builder: (ctx) => AlertDialog(
                                           title: const Text('Cancel Request'),
-                                          content: const Text('Are you sure you want to cancel this request?'),
+                                          content: const Text(
+                                              'Are you sure you want to cancel this request?'),
                                           actions: [
-                                            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('No')),
-                                            ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: Text('Yes')),
+                                            TextButton(
+                                                onPressed: () =>
+                                                    Navigator.pop(ctx, false),
+                                                child: Text('No')),
+                                            ElevatedButton(
+                                                onPressed: () =>
+                                                    Navigator.pop(ctx, true),
+                                                child: Text('Yes')),
                                           ],
                                         ),
                                       );
                                       if (confirm == true) {
-                                        await _cancelRequest(req['id'].toString());
+                                        await _cancelRequest(
+                                            req['id'].toString());
                                       }
                                     }
                                   : null,
-                              onApprove: showActionButtons ? () async {
-                                final reason = await _showReasonDialog(context, 'Approve');
-                                if (reason != null && reason.isNotEmpty) {
-                                  await _handleAttendanceAction(req['id'].toString(), 'Approved', requestType, reason);
-                                }
-                              } : null,
-                              onReject: showActionButtons ? () async {
-                                final reason = await _showReasonDialog(context, 'Reject');
-                                if (reason != null && reason.isNotEmpty) {
-                                  await _handleAttendanceAction(req['id'].toString(), 'Rejected', requestType, reason);
-                                }
-                              } : null,
+                              onApprove: showActionButtons
+                                  ? () async {
+                                      final reason = await _showReasonDialog(
+                                          context, 'Approve');
+                                      if (reason != null && reason.isNotEmpty) {
+                                        await _handleAttendanceAction(
+                                            req['id'].toString(),
+                                            'Approved',
+                                            requestType,
+                                            reason);
+                                      }
+                                    }
+                                  : null,
+                              onReject: showActionButtons
+                                  ? () async {
+                                      final reason = await _showReasonDialog(
+                                          context, 'Reject');
+                                      if (reason != null && reason.isNotEmpty) {
+                                        await _handleAttendanceAction(
+                                            req['id'].toString(),
+                                            'Rejected',
+                                            requestType,
+                                            reason);
+                                      }
+                                    }
+                                  : null,
                             );
                           },
                         ),
@@ -920,7 +988,8 @@ class _DatePickerCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            const Icon(Icons.calendar_today, color: AppColors.primary, size: 18),
+            const Icon(Icons.calendar_today,
+                color: AppColors.primary, size: 18),
             const SizedBox(width: 8),
             Flexible(
               child: Text(
@@ -1011,9 +1080,20 @@ class AttendanceRequestCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(name, style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.bold)),
+                SizedBox(
+                  width: 250,
+                  child: Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.titleMedium.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: statusColor.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(8),
@@ -1031,7 +1111,10 @@ class AttendanceRequestCard extends StatelessWidget {
             ),
             Text(
               '${attendanceType ?? ''} ${requestType.toUpperCase().replaceAll('_', '')}',
-              style: AppTypography.bodySmall.copyWith(color: AppColors.primary, fontWeight: FontWeight.w600, fontSize: 12),
+              style: AppTypography.bodySmall.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12),
             ),
             const SizedBox(height: 5),
             _infoRow('Attendance Date', attendanceDate),
@@ -1052,14 +1135,10 @@ class AttendanceRequestCard extends StatelessWidget {
               _infoRow('Approved On', approvedOn!, valueColor: Colors.green),
             if (isRejected && (approvedOn != null && approvedOn!.isNotEmpty))
               _infoRow('Rejected On', approvedOn!, valueColor: Colors.red),
-
-
             if (isApproved && (adminReason != null && adminReason!.isNotEmpty))
               _infoRow('Approved Note', adminReason!, valueColor: Colors.green),
             if (isRejected && (adminReason != null && adminReason!.isNotEmpty))
               _infoRow('Rejected Reason', adminReason!, valueColor: Colors.red),
-
-
             if (showActions) ...[
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -1071,7 +1150,8 @@ class AttendanceRequestCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   IconButton(
-                    icon: const Icon(Icons.check_circle, color: Colors.green, size: 32),
+                    icon: const Icon(Icons.check_circle,
+                        color: Colors.green, size: 32),
                     onPressed: onApprove,
                     tooltip: 'Approve',
                   ),
@@ -1101,8 +1181,15 @@ class AttendanceRequestCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         children: [
-          SizedBox(width: 120, child: Text('$label :', style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary))),
-          Expanded(child: Text(value, style: AppTypography.bodySmall.copyWith(fontWeight: FontWeight.w500, color: valueColor))),
+          SizedBox(
+              width: 120,
+              child: Text('$label :',
+                  style: AppTypography.bodySmall
+                      .copyWith(color: AppColors.textSecondary))),
+          Expanded(
+              child: Text(value,
+                  style: AppTypography.bodySmall.copyWith(
+                      fontWeight: FontWeight.w500, color: valueColor))),
         ],
       ),
     );
