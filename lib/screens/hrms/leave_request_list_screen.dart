@@ -549,188 +549,193 @@ class _LeaveRequestListScreenState extends State<LeaveRequestListScreen> {
                                 child: Text('No leave requests found.', style: AppTypography.bodyMedium),
                               ),
                             )
-                          : ListView.separated(
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: Responsive.responsiveValue(context: context, mobile: 16, tablet: 32)),
-                              itemCount: _filteredRequests.length,
-                              separatorBuilder: (_, __) => SizedBox(height: Responsive.responsiveValue(context: context, mobile: 12, tablet: 24)),
-                              itemBuilder: (context, i) {
-                                final req = _filteredRequests[i];
-                                final status = (req['status'] ?? '').toString();
-                                final userInfo = req['user'] ?? {};
-                                final reason = (req['reason'] ?? '').toString();
-                                final adminReason = (req['admin_reason'] ?? '').toString();
-                                final requestedDate = req['created_at'] != null
-                                    ? DateTime.parse(req['created_at']).toLocal()
-                                    : null;
-                                final requestedDateLabel = requestedDate != null
-                                    ? DateFormat('dd MMM yyyy, hh:mm a').format(requestedDate)
-                                    : '';
-                                final startDate = req['start_date'] != null && req['start_date'] != ''
-                                    ? DateTime.parse(req['start_date']).toLocal()
-                                    : null;
-                                final endDate = req['end_date'] != null && req['end_date'] != ''
-                                    ? DateTime.parse(req['end_date']).toLocal()
-                                    : null;
-                                final startDateLabel = startDate != null ? DateFormat('dd MMM yyyy').format(startDate) : (req['start_date'] ?? '-');
-                                final endDateLabel = endDate != null ? DateFormat('dd MMM yyyy').format(endDate) : (req['end_date'] ?? '-');
-                                Color statusColor = Colors.grey;
-                                if (status.toLowerCase() == 'pending') {
-                                  statusColor = Colors.orange;
-                                }
-                                if (status.toLowerCase() == 'approved') {
-                                  statusColor = Colors.green;
-                                }
-                                if (status.toLowerCase() == 'rejected') {
-                                  statusColor = Colors.red;
-                                }
-                                final approvedBy = req['approved_by'] is Map ? req['approved_by']['name'] : req['approved_by'];
+                          : RefreshIndicator(
+                              onRefresh: _fetchRequests,
+                              child: ListView.separated(
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: Responsive.responsiveValue(context: context, mobile: 16, tablet: 32)),
+                                itemCount: _filteredRequests.length,
+                                separatorBuilder: (_, __) => SizedBox(height: Responsive.responsiveValue(context: context, mobile: 12, tablet: 24)),
+                                itemBuilder: (context, i) {
+                                  final req = _filteredRequests[i];
+                                  final status = (req['status'] ?? '').toString();
+                                  final userInfo = req['user'] ?? {};
+                                  final reason = (req['reason'] ?? '').toString();
+                                  final adminReason = (req['admin_reason'] ?? '').toString();
+                                  final requestedDate = req['created_at'] != null
+                                      ? DateTime.parse(req['created_at']).toLocal()
+                                      : null;
+                                  final requestedDateLabel = requestedDate != null
+                                      ? DateFormat('dd MMM yyyy, hh:mm a').format(requestedDate)
+                                      : '';
+                                  final startDate = req['start_date'] != null && req['start_date'] != ''
+                                      ? DateTime.parse(req['start_date']).toLocal()
+                                      : null;
+                                  final endDate = req['end_date'] != null && req['end_date'] != ''
+                                      ? DateTime.parse(req['end_date']).toLocal()
+                                      : null;
+                                  final startDateLabel = startDate != null ? DateFormat('dd MMM yyyy').format(startDate) : (req['start_date'] ?? '-');
+                                  final endDateLabel = endDate != null ? DateFormat('dd MMM yyyy').format(endDate) : (req['end_date'] ?? '-');
+                                  Color statusColor = Colors.grey;
+                                  if (status.toLowerCase() == 'pending') {
+                                    statusColor = Colors.orange;
+                                  }
+                                  if (status.toLowerCase() == 'approved') {
+                                    statusColor = Colors.green;
+                                  }
+                                  if (status.toLowerCase() == 'rejected') {
+                                    statusColor = Colors.red;
+                                  }
+                                  final approvedBy = req['approved_by'] is Map ? req['approved_by']['name'] : req['approved_by'];
 
-                                final designationId = user?.data.designationId;
-                                final loggedInUserId = user?.data.id.toString() ?? '';
-                                final requestorId = userInfo['id']?.toString() ?? '';
-                                final requestorDesignationId = userInfo['designation_id'];
-                                bool canShowAction = false;
-                                bool showCancel = false;
+                                  final designationId = user?.data.designationId;
+                                  final loggedInUserId = user?.data.id.toString() ?? '';
+                                  final requestorId = userInfo['id']?.toString() ?? '';
+                                  final requestorDesignationId = userInfo['designation_id'];
+                                  bool canShowAction = false;
+                                  bool showCancel = false;
 
-                                if (widget.isAllUsers) {
-                                  if (status.toLowerCase() == 'pending' && UserAccess.hasAdminAccess(designationId)) {
-                                    if (requestorId != loggedInUserId) {
-                                      if (UserAccess.hasSeniorEngineerAccess(requestorDesignationId)) {
-                                        canShowAction = designationId == UserAccess.admin;
-                                      } else if (!UserAccess.hasAdminAccess(requestorDesignationId)) {
-                                        canShowAction = true;
+                                  if (widget.isAllUsers) {
+                                    if (status.toLowerCase() == 'pending' && UserAccess.hasAdminAccess(designationId)) {
+                                      if (requestorId != loggedInUserId) {
+                                        if (UserAccess.hasSeniorEngineerAccess(requestorDesignationId)) {
+                                          canShowAction = designationId == UserAccess.admin;
+                                        } else if (!UserAccess.hasAdminAccess(requestorDesignationId)) {
+                                          canShowAction = true;
+                                        }
                                       }
                                     }
+                                  } else {
+                                    canShowAction = status.toLowerCase() == 'pending' && UserAccess.hasAdminAccess(designationId);
+                                    showCancel = status.toLowerCase() == 'pending';
                                   }
-                                } else {
-                                  canShowAction = status.toLowerCase() == 'pending' && UserAccess.hasAdminAccess(designationId);
-                                  showCancel = status.toLowerCase() == 'pending';
-                                }
 
-                                final showActions = canShowAction && widget.isAllUsers;
+                                  final showActions = canShowAction && widget.isAllUsers;
 
-                                final approvedAt = req['approved_at'];
-                                final approvedDateLabel = (approvedAt != null && (status.toLowerCase() == 'approved' || status.toLowerCase() == 'rejected'))
-                                    ? DateTime.parse(approvedAt).toLocal()
-                                    : null;
-                                final approvedOnLabel = approvedDateLabel != null
-                                    ? DateFormat('dd MMM yyyy, hh:mm a').format(approvedDateLabel)
-                                    : '';
-                                final isApproved = status.toLowerCase() == 'approved';
-                                final isRejected = status.toLowerCase() == 'rejected';
-                                final isCancelled = status.toLowerCase() == 'cancelled';
-                                if (isCancelled) {
-                                  statusColor = Colors.grey;
-                                }
+                                  final approvedAt = req['approved_at'];
+                                  final approvedDateLabel = (approvedAt != null && (status.toLowerCase() == 'approved' || status.toLowerCase() == 'rejected'))
+                                      ? DateTime.parse(approvedAt).toLocal()
+                                      : null;
+                                  final approvedOnLabel = approvedDateLabel != null
+                                      ? DateFormat('dd MMM yyyy, hh:mm a').format(approvedDateLabel)
+                                      : '';
+                                  final isApproved = status.toLowerCase() == 'approved';
+                                  final isRejected = status.toLowerCase() == 'rejected';
+                                  final isCancelled = status.toLowerCase() == 'cancelled';
+                                  if (isCancelled) {
+                                    statusColor = Colors.grey;
+                                  }
 
-                                return Container(
-                                  padding: const EdgeInsets.all(16.0),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(14),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.08),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                    border: Border.all(color: Colors.grey.withOpacity(0.15)),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text(widget.isAllUsers ? (userInfo['name'] ?? '-') : (req['leave_type'] ?? '-'), style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.bold)),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                            decoration: BoxDecoration(
-                                              color: statusColor.withOpacity(0.12),
-                                              borderRadius: BorderRadius.circular(8),
-                                            ),
-                                            child: Text(
-                                              status[0].toUpperCase() + status.substring(1).toLowerCase(),
-                                              style: AppTypography.bodySmall.copyWith(
-                                                color: statusColor,
-                                                fontWeight: FontWeight.bold,
-                                                letterSpacing: 0.5,
+                                  return Container(
+                                    margin: EdgeInsets.only(bottom: (i == _filteredRequests.length - 1) ? 120 : 0),
+                                    padding: const EdgeInsets.all(16.0),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(14),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.08),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                      border: Border.all(color: Colors.grey.withOpacity(0.15)),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(widget.isAllUsers ? (userInfo['name'] ?? '-') : (req['leave_type'] ?? '-'), style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.bold)),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: statusColor.withOpacity(0.12),
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: Text(
+                                                status[0].toUpperCase() + status.substring(1).toLowerCase(),
+                                                style: AppTypography.bodySmall.copyWith(
+                                                  color: statusColor,
+                                                  fontWeight: FontWeight.bold,
+                                                  letterSpacing: 0.5,
+                                                ),
                                               ),
                                             ),
+                                          ],
+                                        ),
+                                        if (widget.isAllUsers)
+                                          _infoRow('Leave Type', req['leave_type'] ?? '-'),
+                                        _infoRow('Duration', req['duration'] ?? '-'),
+                                        _infoRow('Start Date', startDateLabel),
+                                        _infoRow('End Date', endDateLabel),
+                                        _infoRow('Reason', reason),
+                                        if (req['early_off_start_time'] != null && req['duration'] == "Early Off")
+                                          _infoRow('Early Off From', req['early_off_start_time'] ?? '-'),
+                                        if (req['early_off_start_time'] != null && req['duration'] == "Late Coming")
+                                          _infoRow('Late Coming Till', req['early_off_start_time'] ?? '-'),
+                                        _infoRow('Requested On', requestedDateLabel),
+                                        if (isApproved && (approvedBy != null && approvedBy.isNotEmpty))
+                                          _infoRow('Approved By', approvedBy, valueColor: Colors.green),
+                                        if (isRejected && (approvedBy != null && approvedBy.isNotEmpty))
+                                          _infoRow('Rejected By', approvedBy, valueColor: Colors.red),
+                                        if (isApproved && approvedOnLabel.isNotEmpty)
+                                          _infoRow('Approved On', approvedOnLabel, valueColor: Colors.green),
+                                        if (isRejected && approvedOnLabel.isNotEmpty)
+                                          _infoRow('Rejected On', approvedOnLabel, valueColor: Colors.red),
+                                        if (isApproved && adminReason.isNotEmpty)
+                                          _infoRow('Approved Note', adminReason, valueColor: Colors.green),
+                                        if (isRejected && adminReason.isNotEmpty)
+                                          _infoRow('Rejected Reason', adminReason, valueColor: Colors.red),
+                                        if (isCancelled)
+                                          _infoRow('Status', 'Cancelled', valueColor: Colors.grey),
+                                        if (showActions) ...[
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.end,
+                                            children: [
+                                              IconButton(
+                                                icon: const Icon(Icons.close, color: Colors.red, size: 32),
+                                                onPressed: () async {
+                                                  if (reason.isNotEmpty) {
+                                                    await _handleLeaveAction(req['id'].toString(), 'Rejected');
+                                                  }
+                                                },
+                                                tooltip: 'Reject',
+                                              ),
+                                              const SizedBox(width: 8),
+                                              IconButton(
+                                                icon: const Icon(Icons.check_circle, color: Colors.green, size: 32),
+                                                onPressed: () async {
+                                                  if (reason.isNotEmpty) {
+                                                    await _handleLeaveAction(req['id'].toString(), 'Approved');
+                                                  }
+                                                },
+                                                tooltip: 'Approve',
+                                              ),
+                                            ],
                                           ),
                                         ],
-                                      ),
-                                      if (widget.isAllUsers)
-                                        _infoRow('Leave Type', req['leave_type'] ?? '-'),
-                                      _infoRow('Duration', req['duration'] ?? '-'),
-                                      _infoRow('Start Date', startDateLabel),
-                                      _infoRow('End Date', endDateLabel),
-                                      _infoRow('Reason', reason),
-                                      if (req['early_off_start_time'] != null)
-                                        _infoRow('Early Off Start', req['early_off_start_time'] ?? '-'),
-                                      if (req['early_off_end_time'] != null)
-                                        _infoRow('Early Off End', req['early_off_end_time'] ?? '-'),
-                                      _infoRow('Requested On', requestedDateLabel),
-                                      if (isApproved && (approvedBy != null && approvedBy.isNotEmpty))
-                                        _infoRow('Approved By', approvedBy, valueColor: Colors.green),
-                                      if (isRejected && (approvedBy != null && approvedBy.isNotEmpty))
-                                        _infoRow('Rejected By', approvedBy, valueColor: Colors.red),
-                                      if (isApproved && approvedOnLabel.isNotEmpty)
-                                        _infoRow('Approved On', approvedOnLabel, valueColor: Colors.green),
-                                      if (isRejected && approvedOnLabel.isNotEmpty)
-                                        _infoRow('Rejected On', approvedOnLabel, valueColor: Colors.red),
-                                      if (isApproved && adminReason.isNotEmpty)
-                                        _infoRow('Approved Note', adminReason, valueColor: Colors.green),
-                                      if (isRejected && adminReason.isNotEmpty)
-                                        _infoRow('Rejected Reason', adminReason, valueColor: Colors.red),
-                                      if (isCancelled)
-                                        _infoRow('Status', 'Cancelled', valueColor: Colors.grey),
-                                      if (showActions) ...[
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.end,
-                                          children: [
-                                            IconButton(
-                                              icon: const Icon(Icons.close, color: Colors.red, size: 32),
-                                              onPressed: () async {
-                                                if (reason.isNotEmpty) {
-                                                  await _handleLeaveAction(req['id'].toString(), 'Rejected');
-                                                }
-                                              },
-                                              tooltip: 'Reject',
-                                            ),
-                                            const SizedBox(width: 8),
-                                            IconButton(
-                                              icon: const Icon(Icons.check_circle, color: Colors.green, size: 32),
-                                              onPressed: () async {
-                                                if (reason.isNotEmpty) {
-                                                  await _handleLeaveAction(req['id'].toString(), 'Approved');
-                                                }
-                                              },
-                                              tooltip: 'Approve',
-                                            ),
-                                          ],
-                                        ),
+                                        if (showCancel) ...[
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.end,
+                                            children: [
+                                              IconButton(
+                                                icon: const Icon(Icons.close, color: Colors.red, size: 32),
+                                                onPressed: () => _cancelRequest(req['id'].toString()),
+                                                tooltip: 'Cancel',
+                                              ),
+                                            ],
+                                          ),
+                                        ],
                                       ],
-                                      if (showCancel) ...[
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.end,
-                                          children: [
-                                            IconButton(
-                                              icon: const Icon(Icons.close, color: Colors.red, size: 32),
-                                              onPressed: () => _cancelRequest(req['id'].toString()),
-                                              tooltip: 'Cancel',
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                );
-                              },
+                                    ),
+                                  );
+                                },
+                              ),
                             ),
                     ),
+
                   ],
                 ),
               if(!widget.isAllUsers) Align(
@@ -739,7 +744,8 @@ class _LeaveRequestListScreenState extends State<LeaveRequestListScreen> {
                   padding:  EdgeInsets.only(
                     left: Responsive.responsiveValue(context: context, mobile: 14, tablet: 32),
                     right: Responsive.responsiveValue(context: context, mobile: 14, tablet: 32),
-                    bottom: Responsive.responsiveValue(context: context, mobile: 20, tablet: 42),
+                    bottom: MediaQuery.of(context).padding.bottom +
+                        Responsive.spacingM,
                   ),
                   child: CustomButton(text: "Apply For a Leave", onPressed: () {
                     NavigationUtils.push(

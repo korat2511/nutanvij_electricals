@@ -172,7 +172,7 @@ class _ApplyExpenseScreenState extends State<ApplyExpenseScreen> {
                             color: Colors.white,
                           ),
                           child: _imagePaths.isEmpty
-                              ? Center(
+                              ? const Center(
                                   child: Icon(Icons.add_a_photo, color: AppColors.primary, size: 32),
                                 )
                               : ClipRRect(

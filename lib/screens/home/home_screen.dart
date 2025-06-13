@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:nutanvij_electricals/screens/auth/signup_screen.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -18,6 +16,7 @@ import 'package:geolocator/geolocator.dart';
 import '../hrms/attendance_summary_screen.dart';
 import '../../core/utils/responsive.dart';
 import '../auth/change_password_screen.dart';
+import '../site/site_list_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -37,55 +36,11 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _autoAttendanceCheck();
-    _setupLocationTracking();
   }
 
   @override
   void dispose() {
-    LocationService.stopLocationTracking();
     super.dispose();
-  }
-
-  void _setupLocationTracking() {
-    LocationService.onAutoPunchOut = (description) async {
-      if (_attendanceFlag == 'check_out') {
-        await _autoPunchOut(description);
-      }
-    };
-  }
-
-  Future<void> _autoPunchOut(String description) async {
-    final userProvider = Provider.of<UserProvider>(context, listen: false);
-    final user = userProvider.user;
-    if (user == null) return;
-
-    try {
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-      final address = await LocationService.getCurrentAddress();
-
-      await ApiService().saveAttendance(
-        context: context,
-        apiToken: user.data.apiToken,
-        type: 'check_out',
-        latitude: position.latitude.toString(),
-        longitude: position.longitude.toString(),
-        address: address,
-        checkInDescription: description,
-      );
-
-      await LocationService.clearCheckInLocation();
-      await _autoAttendanceCheck();
-      
-      if (mounted) {
-        SnackBarUtils.showSuccess(context, 'Auto punch-out: $description');
-      }
-    } catch (e) {
-      if (mounted) {
-        SnackBarUtils.showError(context, e.toString());
-      }
-    }
   }
 
   Future<void> _autoAttendanceCheck() async {
@@ -111,14 +66,6 @@ class _HomeScreenState extends State<HomeScreen> {
         _checkInTime = inTime;
         _checkOutTime = outTime;
       });
-
-      // Start/stop location tracking based on attendance status
-      if (flag == 'check_out') {
-        await LocationService.startLocationTracking();
-      } else {
-        LocationService.stopLocationTracking();
-        await LocationService.clearCheckInLocation();
-      }
     } catch (e) {
       SnackBarUtils.showError(context, "$e");
     }
@@ -140,6 +87,22 @@ class _HomeScreenState extends State<HomeScreen> {
     final user = userProvider.user;
     if (user == null) return;
     try {
+      // Check location permission first
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          setState(() => _isMarkingAttendance = false);
+          SnackBarUtils.showError(context, 'Location permission is required for attendance');
+          return;
+        }
+      }
+      if (permission == LocationPermission.deniedForever) {
+        setState(() => _isMarkingAttendance = false);
+        SnackBarUtils.showError(context, 'Location permission is permanently denied. Please enable it in settings.');
+        return;
+      }
+
       // Pick image
       final picker = ImagePicker();
       final pickedFile =
@@ -149,11 +112,25 @@ class _HomeScreenState extends State<HomeScreen> {
         SnackBarUtils.showError(context, 'Selfie is required');
         return;
       }
+
       // Get location
-      Position position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high);
-      // Optionally, get address string
-      final address = await LocationService.getCurrentAddress();
+      Position position;
+      try {
+        position = await LocationService.getCurrentPosition();
+      } catch (e) {
+        setState(() => _isMarkingAttendance = false);
+        SnackBarUtils.showError(context, 'Failed to get location. Please try again.');
+        return;
+      }
+
+      // Get address
+      String address;
+      try {
+        address = await LocationService.getCurrentAddress();
+      } catch (e) {
+        address = 'Address not available';
+      }
+
       // Call API
       await ApiService().saveAttendance(
         context: context,
@@ -165,20 +142,16 @@ class _HomeScreenState extends State<HomeScreen> {
         imagePath: pickedFile.path,
       );
 
-      // Save check-in location if punching in
-      if (type == 'check_in') {
-        await LocationService.saveCheckInLocation(
-          position.latitude,
-          position.longitude,
-        );
-      } else {
-        await LocationService.clearCheckInLocation();
-      }
-
       SnackBarUtils.showSuccess(context, 'Attendance marked successfully');
       await _autoAttendanceCheck(); // Refresh flag and button state
     } catch (e) {
-      SnackBarUtils.showError(context, e.toString());
+      String errorMessage = 'Failed to mark attendance';
+      if (e.toString().contains('Network error')) {
+        errorMessage = 'Network error. Please check your internet connection.';
+      } else if (e.toString().contains('Session expired')) {
+        errorMessage = 'Session expired. Please login again.';
+      }
+      SnackBarUtils.showError(context, errorMessage);
     } finally {
       setState(() => _isMarkingAttendance = false);
     }
@@ -224,16 +197,21 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  String? formatTime(String? dateTimeStr) {
-    if (dateTimeStr == null || dateTimeStr == "0000-00-00 00:00:00") return "--:--:--";
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+  }
+
+  String? formatTime(String? timeStr) {
+    if (timeStr == null || timeStr == "0000-00-00 00:00:00") return "--:--";
     try {
-      final dateTime = DateTime.parse(dateTimeStr);
-      return DateFormat('HH:mm:ss').format(dateTime);
+      final dateTime = DateTime.parse(timeStr);
+      return DateFormat('hh:mm a').format(dateTime);
     } catch (e) {
-      if (dateTimeStr.length >= 19) {
-        return dateTimeStr.substring(11, 19);
+      if (timeStr.length >= 8) {
+        return timeStr.substring(11, 16);
       }
-      return "--:--:--";
+      return "--:--";
     }
   }
 
@@ -344,25 +322,22 @@ class _HomeScreenState extends State<HomeScreen> {
                   leading: const Icon(Icons.person_outline),
                   title: const Text('Profile'),
                   onTap: () {
-                    Navigator.pop(context);
+                    NavigationUtils.pop(context);
                   },
                 ),
                 ListTile(
                   leading: const Icon(Icons.lock_outline),
                   title: const Text('Change Password'),
                   onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
-                    );
+                    NavigationUtils.pop(context);
+                    NavigationUtils.push(context, const ChangePasswordScreen());
                   },
                 ),
                 ListTile(
                   leading: const Icon(Icons.settings_outlined),
                   title: const Text('Settings'),
                   onTap: () {
-                    Navigator.pop(context);
+                    NavigationUtils.pop(context);
                   },
                 ),
 
@@ -370,7 +345,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   leading: const Icon(Icons.logout),
                   title: const Text('Logout'),
                   onTap: () {
-                    Navigator.pop(context);
+                    NavigationUtils.pop(context);
                     _handleLogout();
                   },
                 ),
@@ -437,16 +412,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         icon: 'assets/images/hrms.png',
                         label: 'HRMS',
                         onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const AttendanceSummaryScreen()),
-                          );
+                          NavigationUtils.push(context, const AttendanceSummaryScreen());
                         },
                       ),
                       _buildQuickActionButton(
                         icon: 'assets/images/site.png',
                         label: 'Sites & Tasks',
-                        onTap: () {},
+                        onTap: () {
+                          NavigationUtils.push(context, const SiteListScreen());
+                        },
                       ),
                       _buildQuickActionButton(
                         icon: 'assets/images/accounting.png',

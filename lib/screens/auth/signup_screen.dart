@@ -15,6 +15,7 @@ import '../../services/api_service.dart';
 import '../../widgets/custom_text_field.dart';
 import 'login_screen.dart';
 import '../../widgets/custom_button.dart';
+import '../../core/utils/navigation_utils.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -215,10 +216,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
       // Show success message and navigate to login
       SnackBarUtils.showSuccess(context, 'Account created successfully');
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
-      );
+      NavigationUtils.pushReplacement(context, const LoginScreen());
     } on ApiException catch (e) {
       if (!mounted) return;
       SnackBarUtils.showError(context, e.message);
@@ -484,13 +482,44 @@ class _SignupScreenState extends State<SignupScreen> {
                   CustomTextField(
                     controller: _panController,
                     label: 'PAN Card Number (Optional)',
+                    inputFormatters: [
+                      UpperCaseTextFormatter(),
+                      FilteringTextInputFormatter.allow(RegExp(r'[A-Z0-9]')),
+                      LengthLimitingTextInputFormatter(10),
+                    ],
+                    validator: (value) {
+                      if (value == null || value.isEmpty) return null; // Optional field
+                      if (value.length != 10) return 'PAN number must be 10 characters';
+                      // PAN format: ABCDE1234F (5 letters, 4 numbers, 1 letter)
+                      final panRegex = RegExp(r'^[A-Z]{5}[0-9]{4}[A-Z]{1}$');
+                      if (!panRegex.hasMatch(value)) {
+                        return 'Invalid PAN format. Example: ABCDE1234F';
+                      }
+                      return null;
+                    },
                   ),
                   SizedBox(height: Responsive.responsiveValue(context: context, mobile: 14, tablet: 20)),
                   CustomTextField(
                     controller: _aadharController,
                     label: 'Aadhar Card Number (Optional)',
                     keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(12),
+                    ],
+                    validator: (value) {
+                      if (value == null || value.isEmpty) return null; // Optional field
+                      if (value.length != 12) return 'Aadhar number must be 12 digits';
+                      // Check if all digits are not same (e.g., 111111111111)
+                      if (value.split('').every((digit) => digit == value[0])) {
+                        return 'Invalid Aadhar number';
+                      }
+                      // Check if it's not starting with 0 or 1
+                      if (value.startsWith('0') || value.startsWith('1')) {
+                        return 'Invalid Aadhar number';
+                      }
+                      return null;
+                    },
                   ),
                   SizedBox(height: Responsive.responsiveValue(context: context, mobile: 24, tablet: 36)),
                   // SECTION: Images
@@ -512,12 +541,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   Center(
                     child: TextButton(
                       onPressed: () {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const LoginScreen(),
-                          ),
-                        );
+                        NavigationUtils.pushReplacement(context, const LoginScreen());
                       },
                       child: Text(
                         'Already have an account? Login',
@@ -600,7 +624,7 @@ class PerfectDropdownField<T> extends StatelessWidget {
                           shrinkWrap: true,
                           children: items.map((item) => ListTile(
                             title: Text(itemLabel(item)),
-                            onTap: () => Navigator.pop(context, item),
+                            onTap: () => NavigationUtils.pop(context, item),
                             selected: item == value,
                           )).toList(),
                         ),
@@ -623,6 +647,16 @@ class PerfectDropdownField<T> extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class UpperCaseTextFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    return TextEditingValue(
+      text: newValue.text.toUpperCase(),
+      selection: newValue.selection,
     );
   }
 } 

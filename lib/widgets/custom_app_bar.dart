@@ -13,6 +13,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final bool showNotification;
   final double height;
   final String? title;
+  final List<Widget>? actions;
 
   const CustomAppBar({
     super.key,
@@ -21,6 +22,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.showNotification = true,
     this.height = kToolbarHeight + 32, // Added extra height for status bar
     this.title,
+    this.actions,
   });
 
   @override
@@ -93,9 +95,10 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                   ],
                 ),
 
-                // Right: Notification & Profile
+                // Right: Notification & Profile & Actions
                 Row(
                   children: [
+                    if (actions != null) ...actions!,
                     if (showNotification) ...[
                       Stack(
                         children: [

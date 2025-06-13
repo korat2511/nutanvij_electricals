@@ -539,7 +539,9 @@ class _EditAttendanceRequestListScreenState
                                 style: AppTypography.bodyMedium),
                           ),
                         )
-                      : ListView.separated(
+                      : RefreshIndicator(
+                          onRefresh: _fetchRequests,
+                          child: ListView.separated(
                           padding: EdgeInsets.symmetric(
                               horizontal: Responsive.responsiveValue(
                                   context: context, mobile: 16, tablet: 32)),
@@ -731,12 +733,12 @@ class _EditAttendanceRequestListScreenState
                                           actions: [
                                             TextButton(
                                                 onPressed: () =>
-                                                    Navigator.pop(ctx, false),
-                                                child: Text('No')),
+                                                    NavigationUtils.pop(ctx, false),
+                                                child: const Text('No')),
                                             ElevatedButton(
                                                 onPressed: () =>
-                                                    Navigator.pop(ctx, true),
-                                                child: Text('Yes')),
+                                                    NavigationUtils.pop(ctx, true),
+                                                child: const Text('Yes')),
                                           ],
                                         ),
                                       );
@@ -774,6 +776,7 @@ class _EditAttendanceRequestListScreenState
                                   : null,
                             );
                           },
+                          ),
                         ),
                 ),
               ],
@@ -1081,7 +1084,7 @@ class AttendanceRequestCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 SizedBox(
-                  width: 250,
+                  width: 150,
                   child: Text(
                     name,
                     maxLines: 1,
@@ -1091,6 +1094,7 @@ class AttendanceRequestCard extends StatelessWidget {
                     ),
                   ),
                 ),
+
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 4),

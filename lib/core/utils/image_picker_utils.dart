@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
+import 'dart:io';
 
 class ImagePickerUtils {
   static Future<String?> pickImage({
@@ -66,25 +67,9 @@ class ImagePickerUtils {
     }
   }
 
-  static Future<List<String>> pickMultipleImages({
-    required BuildContext context,
-    int imageQuality = 70,
-  }) async {
-    try {
-      final List<XFile> images = await ImagePicker().pickMultiImage(
-        imageQuality: imageQuality,
-      );
-      return images.map((image) => image.path).toList();
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to pick images: ${e.toString()}'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-      return [];
-    }
+  static Future<List<String>> pickMultipleImages({required BuildContext context}) async {
+    final ImagePicker picker = ImagePicker();
+    final List<XFile> images = await picker.pickMultiImage();
+    return images.map((xFile) => xFile.path).toList();
   }
 } 

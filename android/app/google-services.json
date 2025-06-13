@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "287946113595",
+    "project_id": "nutanvij-electricals",
+    "storage_bucket": "nutanvij-electricals.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:287946113595:android:ce734a12d1b824adcb121e",
+        "android_client_info": {
+          "package_name": "com.nutanvij.nutanvij_electricals"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBwTRAkAkb4HZAv--THzM1cCBVdVF3PCNY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

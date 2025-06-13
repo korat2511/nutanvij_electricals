@@ -51,15 +51,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
       // Update user provider with logged in user
       final userProvider = Provider.of<UserProvider>(context, listen: false);
-      await userProvider.setUser(user);
+      await userProvider.setUser(user, context);
 
       // Show success message and navigate to home
       SnackBarUtils.showSuccess(context, 'Login successful');
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
-        (route) => false,
-      );
+      NavigationUtils.pushAndRemoveUntil(context, HomeScreen());
     } on ApiException catch (e) {
       if (!mounted) return;
       SnackBarUtils.showError(context, e.message);

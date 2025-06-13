@@ -11,10 +11,11 @@ class UserProvider extends ChangeNotifier {
   UserModel? get user => _user;
   bool get isLoading => _isLoading;
 
-  Future<void> setUser(UserModel user) async {
+  Future<void> setUser(UserModel user, BuildContext context) async {
     _user = user;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_userKey, json.encode(user.toJson()));
+    await prefs.setString('userId', user.data.id.toString());
     notifyListeners();
   }
 
@@ -31,6 +32,7 @@ class UserProvider extends ChangeNotifier {
     _user = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_userKey);
+    await prefs.remove('userId');
     notifyListeners();
   }
 

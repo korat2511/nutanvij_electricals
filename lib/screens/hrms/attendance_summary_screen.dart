@@ -95,11 +95,8 @@ class _AttendanceSummaryScreenState extends State<AttendanceSummaryScreen>
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     final user = userProvider.user;
     if (user == null) return;
-    final initial = TimeOfDay(
-      hour: int.tryParse(initialTime.split(":")[0]) ?? 9,
-      minute: int.tryParse(initialTime.split(":")[1]) ?? 0,
-    );
-    TimeOfDay? pickedTime = initial;
+    DateTime? pickedDate;
+    TimeOfDay? pickedTime;
     String reason = '';
     final formKey = GlobalKey<FormState>();
     final reasonController = TextEditingController();
@@ -132,6 +129,51 @@ class _AttendanceSummaryScreenState extends State<AttendanceSummaryScreen>
                       ),
                       const SizedBox(height: 24),
                       Text(
+                        'Select Date',
+                        style: AppTypography.bodyMedium.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      GestureDetector(
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: DateTime.now().subtract(const Duration(days: 1)),
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime.now().subtract(const Duration(days: 1)),
+                          );
+                          if (picked != null) {
+                            setState(() {
+                              pickedDate = picked;
+                            });
+                          }
+                        },
+                        child: AbsorbPointer(
+                          child: TextFormField(
+                            decoration: InputDecoration(
+                              labelText: 'Date',
+                              labelStyle: AppTypography.bodySmall.copyWith(color: AppColors.primary),
+                              suffixIcon: const Icon(Icons.calendar_today, color: AppColors.primary),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(color: AppColors.primary),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(color: AppColors.primary, width: 2),
+                              ),
+                            ),
+                            controller: TextEditingController(
+                              text: pickedDate != null ? DateFormat('yyyy-MM-dd').format(pickedDate!) : '',
+                            ),
+                            validator: (val) => (pickedDate == null) ? 'Please select a date' : null,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
                         'Select Time',
                         style: AppTypography.bodyMedium.copyWith(
                           color: AppColors.textPrimary,
@@ -143,7 +185,7 @@ class _AttendanceSummaryScreenState extends State<AttendanceSummaryScreen>
                         onTap: () async {
                           final picked = await showTimePicker(
                             context: context,
-                            initialTime: pickedTime!,
+                            initialTime: TimeOfDay.now(),
                           );
                           if (picked != null) {
                             setState(() {
@@ -154,25 +196,22 @@ class _AttendanceSummaryScreenState extends State<AttendanceSummaryScreen>
                         child: AbsorbPointer(
                           child: TextFormField(
                             decoration: InputDecoration(
-                              labelText: 'Actual time',
-                              labelStyle: AppTypography.bodySmall
-                                  .copyWith(color: AppColors.primary),
-                              suffixIcon: const Icon(Icons.access_time,
-                                  color: AppColors.primary),
+                              labelText: 'Time',
+                              labelStyle: AppTypography.bodySmall.copyWith(color: AppColors.primary),
+                              suffixIcon: const Icon(Icons.access_time, color: AppColors.primary),
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide:
-                                    const BorderSide(color: AppColors.primary),
+                                borderSide: const BorderSide(color: AppColors.primary),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(
-                                    color: AppColors.primary, width: 2),
+                                borderSide: const BorderSide(color: AppColors.primary, width: 2),
                               ),
                             ),
                             controller: TextEditingController(
-                              text: pickedTime!.format(context),
+                              text: pickedTime != null ? pickedTime!.format(context) : '',
                             ),
+                            validator: (val) => (pickedTime == null) ? 'Please select a time' : null,
                           ),
                         ),
                       ),
@@ -181,17 +220,14 @@ class _AttendanceSummaryScreenState extends State<AttendanceSummaryScreen>
                         controller: reasonController,
                         decoration: InputDecoration(
                           labelText: 'Reason',
-                          labelStyle: AppTypography.bodySmall
-                              .copyWith(color: AppColors.primary),
+                          labelStyle: AppTypography.bodySmall.copyWith(color: AppColors.primary),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide:
-                                const BorderSide(color: AppColors.primary),
+                            borderSide: const BorderSide(color: AppColors.primary),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                                color: AppColors.primary, width: 2),
+                            borderSide: const BorderSide(color: AppColors.primary, width: 2),
                           ),
                         ),
                         validator: (val) => (val == null || val.trim().isEmpty)
@@ -236,10 +272,16 @@ class _AttendanceSummaryScreenState extends State<AttendanceSummaryScreen>
         );
       },
     );
-    if (!submitted || reason.trim().isEmpty) return;
-    final formattedTime =
-        "${pickedTime!.hour.toString().padLeft(2, '0')}:${pickedTime!.minute.toString().padLeft(2, '0')}:00";
-    final fullTimestamp = toFullTimestamp(formattedTime);
+    if (!submitted || reason.trim().isEmpty || pickedDate == null || pickedTime == null) return;
+    // Combine date and time
+    final combinedDateTime = DateTime(
+      pickedDate!.year,
+      pickedDate!.month,
+      pickedDate!.day,
+      pickedTime!.hour,
+      pickedTime!.minute,
+    );
+    final formattedDateTime = DateFormat('yyyy-MM-dd HH:mm:ss').format(combinedDateTime);
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -251,7 +293,7 @@ class _AttendanceSummaryScreenState extends State<AttendanceSummaryScreen>
         apiToken: user.data.apiToken,
         attendanceId: attendanceId,
         type: type,
-        time: fullTimestamp,
+        time: formattedDateTime,
         reason: reason,
       );
       Navigator.of(context).pop();
@@ -328,7 +370,7 @@ class _AttendanceSummaryScreenState extends State<AttendanceSummaryScreen>
                                     color: AppColors.primary),
                                 title: const Text('View User Attendances'),
                                 onTap: () {
-                                  Navigator.pop(ctx);
+                                  NavigationUtils.pop(ctx);
                                   NavigationUtils.push(
                                       context, const AllUserAttendanceScreen());
                                 },
@@ -338,7 +380,7 @@ class _AttendanceSummaryScreenState extends State<AttendanceSummaryScreen>
                                     color: AppColors.primary),
                                 title: const Text('Attendance Requests'),
                                 onTap: () {
-                                  Navigator.pop(ctx);
+                                  NavigationUtils.pop(ctx);
                                   NavigationUtils.push(
                                       context,
                                       const EditAttendanceRequestListScreen(
@@ -350,7 +392,7 @@ class _AttendanceSummaryScreenState extends State<AttendanceSummaryScreen>
                                     color: AppColors.primary),
                                 title: const Text('Leave Requests'),
                                 onTap: () {
-                                  Navigator.pop(ctx);
+                                  NavigationUtils.pop(ctx);
                                   NavigationUtils.push(
                                       context,
                                       const LeaveRequestListScreen(isAllUsers: true));
@@ -361,7 +403,7 @@ class _AttendanceSummaryScreenState extends State<AttendanceSummaryScreen>
                                     color: AppColors.primary),
                                 title: const Text('Expenses Requests'),
                                 onTap: () {
-                                  Navigator.pop(ctx);
+                                  NavigationUtils.pop(ctx);
                                   NavigationUtils.push(
                                       context,
                                       const ExpenseRequestListScreen(isAllUsers: true));
@@ -424,7 +466,7 @@ class _AttendanceSummaryScreenState extends State<AttendanceSummaryScreen>
                 // const HolidayCalendarScreen(),
                   const LeaveRequestListScreen(isAllUsers: false),
 
-                ExpenseRequestListScreen()
+                const ExpenseRequestListScreen()
 
                 // Center(
                 //     child:

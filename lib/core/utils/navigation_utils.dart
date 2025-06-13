@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 
 class NavigationUtils {
-  static void push(BuildContext context, Widget page) {
-    Navigator.push(
+  static Future<T?> push<T>(BuildContext context, Widget page) {
+    return Navigator.push<T>(
       context,
       MaterialPageRoute(builder: (context) => page),
     );
   }
 
-  static void pushReplacement(BuildContext context, Widget page) {
-    Navigator.pushReplacement(
+  static Future<T?> pushReplacement<T>(BuildContext context, Widget page) {
+    return Navigator.pushReplacement<T, dynamic>(
       context,
       MaterialPageRoute(builder: (context) => page),
     );

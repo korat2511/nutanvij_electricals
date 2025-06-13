@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -38,16 +40,20 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
   ];
   final List<String> _halfDaySessions = ['First Half', 'Second Half'];
 
+  String? _formatTimeOfDay24(TimeOfDay? tod) {
+    if (tod == null) return null;
+    return '${tod.hour.toString().padLeft(2, '0')}:${tod.minute.toString().padLeft(2, '0')}';
+  }
+
   Future<void> _pickDate(BuildContext context, bool isStart) async {
     final initialDate = isStart
         ? (_startDate ?? DateTime.now())
         : (_endDate ?? _startDate ?? DateTime.now());
-    final firstDate = isStart ? DateTime.now() : (_startDate ?? DateTime.now());
     final picked = await showDatePicker(
       context: context,
       initialDate: initialDate,
-      firstDate: firstDate,
-      lastDate: DateTime(2100),
+      firstDate: DateTime.now().subtract(const Duration(days: 30)),
+      lastDate: DateTime.now().add(const Duration(days: 90)),
     );
     if (picked != null) {
       setState(() {
@@ -144,6 +150,8 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       final user = userProvider.user;
       if (user == null) throw Exception('User not found');
+
+      log("_duration == $_duration");
       await ApiService().applyForLeave(
         context: context,
         apiToken: user.data.apiToken,
@@ -155,10 +163,10 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
         halfDaySession: _halfDaySession,
         earlyOffStartTime:
             _duration == 'Early Off' && _earlyOffStartTime != null
-                ? _earlyOffStartTime!.format(context)
+                ? _formatTimeOfDay24(_earlyOffStartTime)
                 : null,
         earlyOffEndTime: _duration == 'Early Off' && _earlyOffEndTime != null
-            ? _earlyOffEndTime!.format(context)
+            ? _formatTimeOfDay24(_earlyOffEndTime)
             : null,
       );
       SnackBarUtils.showSuccess(context, 'Leave applied successfully!');

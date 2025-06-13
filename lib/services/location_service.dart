@@ -1,96 +1,12 @@
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
-import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:async';
-import 'package:device_info_plus/device_info_plus.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart';
 
 class LocationService {
-  static const String _checkInLatKey = 'check_in_latitude';
-  static const String _checkInLngKey = 'check_in_longitude';
-  static const double _maxDistanceMeters = 1200.0;
-  static StreamSubscription<Position>? _positionStreamSubscription;
-  static Function(String)? onAutoPunchOut;
-
-  static Future<bool> _requestBackgroundPermissions() async {
-    if (Platform.isIOS) {
-      // For iOS, we need to request "Always" permission for background tracking
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          return false;
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        return false;
-      }
-
-      // Request "Always" permission for background tracking
-      if (permission == LocationPermission.whileInUse) {
-        permission = await Geolocator.requestPermission();
-        if (permission != LocationPermission.always) {
-          return false;
-        }
-      }
-    } else {
-      // Android permission handling
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          return false;
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        return false;
-      }
-
-      // Request background location permission for Android 10+
-      if (permission == LocationPermission.whileInUse) {
-        permission = await Geolocator.requestPermission();
-        if (permission != LocationPermission.always) {
-          return false;
-        }
-      }
-
-      // Request battery optimization exemption for Android
-      final deviceInfo = DeviceInfoPlugin();
-      final androidInfo = await deviceInfo.androidInfo;
-      if (androidInfo.version.sdkInt >= 23) {
-        final status = await Permission.ignoreBatteryOptimizations.status;
-        if (!status.isGranted) {
-          await Permission.ignoreBatteryOptimizations.request();
-        }
-      }
-    }
-
-    return true;
-  }
-
   static Future<String> getCurrentAddress() async {
     try {
-      // Check location permission
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          return 'Location permission denied';
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        return 'Location permission permanently denied';
-      }
-
       // Get current position
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
+      Position position = await getCurrentPosition();
 
       // Get address from coordinates
       List<Placemark> placemarks = await placemarkFromCoordinates(
@@ -105,82 +21,39 @@ class LocationService {
 
       return 'Address not found';
     } catch (e) {
-      return 'Error getting location: $e';
+      debugPrint('Error getting address: $e');
+      return 'Address not available';
     }
   }
 
-  static Future<void> saveCheckInLocation(double latitude, double longitude) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble(_checkInLatKey, latitude);
-    await prefs.setDouble(_checkInLngKey, longitude);
-  }
+  static Future<Position> getCurrentPosition() async {
+    bool serviceEnabled;
+    LocationPermission permission;
 
-  static Future<Position?> getCheckInLocation() async {
-    final prefs = await SharedPreferences.getInstance();
-    final lat = prefs.getDouble(_checkInLatKey);
-    final lng = prefs.getDouble(_checkInLngKey);
+    // Test if location services are enabled.
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      throw Exception('Location services are disabled.');
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        throw Exception('Location permissions are denied');
+                }
+              }
     
-    if (lat != null && lng != null) {
-      return Position(
-        latitude: lat,
-        longitude: lng,
-        timestamp: DateTime.now(),
-        accuracy: 0,
-        altitude: 0,
-        heading: 0,
-        speed: 0,
-        speedAccuracy: 0,
-        altitudeAccuracy: 0,
-        headingAccuracy: 0,
-      );
-    }
-    return null;
-  }
-
-  static Future<void> clearCheckInLocation() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_checkInLatKey);
-    await prefs.remove(_checkInLngKey);
-  }
-
-  static Future<void> startLocationTracking() async {
-    // Request all necessary permissions
-    final hasPermissions = await _requestBackgroundPermissions();
-    if (!hasPermissions) {
-      return;
+    if (permission == LocationPermission.deniedForever) {
+      throw Exception(
+        'Location permissions are permanently denied, we cannot request permissions.');
     }
 
-    // Start location tracking
-    _positionStreamSubscription?.cancel();
-    _positionStreamSubscription = Geolocator.getPositionStream(
-      locationSettings: LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 10, // Update every 10 meters
-        timeLimit: Platform.isIOS ? const Duration(seconds: 30) : null, // iOS requires time limit
-      ),
-    ).listen((Position position) async {
-      final checkInLocation = await getCheckInLocation();
-      if (checkInLocation != null) {
-        final distance = Geolocator.distanceBetween(
-          checkInLocation.latitude,
-          checkInLocation.longitude,
-          position.latitude,
-          position.longitude,
-        );
-
-        if (distance > _maxDistanceMeters) {
-          // Stop tracking and trigger auto punch out
-          stopLocationTracking();
-          if (onAutoPunchOut != null) {
-            onAutoPunchOut!('away from site');
-          }
-        }
-      }
-    });
-  }
-
-  static void stopLocationTracking() {
-    _positionStreamSubscription?.cancel();
-    _positionStreamSubscription = null;
+    // When we reach here, permissions are granted and we can
+    // continue accessing the position of the device.
+    return await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+      timeLimit: const Duration(seconds: 5),
+    );
   }
 } 

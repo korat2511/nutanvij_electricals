@@ -13,6 +13,9 @@ class CustomTextField extends StatelessWidget {
   final String? Function(String?)? validator;
   final TextCapitalization textCapitalization;
   final int? maxLines;
+  final bool readOnly;
+  final VoidCallback? onTap;
+  final ValueChanged<String>? onChanged;
 
   const CustomTextField({
     super.key,
@@ -25,6 +28,9 @@ class CustomTextField extends StatelessWidget {
     this.validator,
     this.textCapitalization = TextCapitalization.none,
     this.maxLines,
+    this.readOnly = false,
+    this.onTap,
+    this.onChanged,
   });
 
   @override
@@ -39,6 +45,9 @@ class CustomTextField extends StatelessWidget {
       textCapitalization: textCapitalization,
       maxLines: maxLines,
       style: AppTypography.bodyLarge,
+      readOnly: readOnly,
+      onTap: onTap,
+      onChanged: onChanged,
       decoration: InputDecoration(
         labelText: label,
         labelStyle: AppTypography.bodySmall.copyWith(

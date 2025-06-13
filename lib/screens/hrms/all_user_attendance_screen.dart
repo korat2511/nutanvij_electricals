@@ -117,10 +117,12 @@ class _AllUserAttendanceScreenState extends State<AllUserAttendanceScreen> {
     final designationId = user?.data.designationId;
     final isAdmin = UserAccess.hasAdminAccess(designationId) || UserAccess.hasSeniorEngineerAccess(designationId) || UserAccess.hasPartnerAccess(designationId);
     if (!isAdmin) {
-      return const Scaffold(
+      return  Scaffold(
         backgroundColor: Colors.white,
-        appBar: CustomAppBar(title: 'All User Attendance'),
-        body: Center(child: Text('You do not have permission to view this page.')),
+        appBar: CustomAppBar(
+            onMenuPressed: () => NavigationUtils.pop(context),
+            title: 'All User Attendance'),
+        body: const Center(child: Text('You do not have permission to view this page.')),
       );
     }
     return Scaffold(
@@ -462,29 +464,59 @@ class _UserSearchDelegate extends SearchDelegate<Map<String, dynamic>?> {
 
   @override
   Widget buildResults(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      child: ListView.builder(
-        itemCount: users.length,
-        itemBuilder: (context, i) {
-          final user = users[i];
-          return ListTile(
-            title: Text(user['name'] ?? 'User'),
-            onTap: () => close(context, user),
-          );
-        },
-      ),
-    );
+    return _buildSearchResults();
   }
 
   @override
   Widget buildSuggestions(BuildContext context) {
+    return _buildSearchResults();
+  }
+
+  Widget _buildSearchResults() {
+    if (query.isEmpty) {
+      return Container(
+        color: Colors.white,
+        child: ListView.builder(
+          itemCount: users.length,
+          itemBuilder: (context, i) {
+            final user = users[i];
+            return ListTile(
+              title: Text(user['name'] ?? 'User'),
+              subtitle: Text(user['email'] ?? ''),
+              onTap: () => close(context, user),
+            );
+          },
+        ),
+      );
+    }
+
+    final filteredUsers = users.where((user) {
+      final name = (user['name'] ?? '').toString().toLowerCase();
+      final email = (user['email'] ?? '').toString().toLowerCase();
+      final searchQuery = query.toLowerCase();
+      return name.contains(searchQuery) || email.contains(searchQuery);
+    }).toList();
+
+    if (filteredUsers.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Text(
+            'No users found matching "$query"',
+            style: AppTypography.bodyMedium.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+      );
+    }
+
     return Container(
       color: Colors.white,
       child: ListView.builder(
-        itemCount: users.length,
+        itemCount: filteredUsers.length,
         itemBuilder: (context, i) {
-          final user = users[i];
+          final user = filteredUsers[i];
           return ListTile(
             title: Text(user['name'] ?? 'User'),
             onTap: () => close(context, user),

@@ -181,7 +181,7 @@ class _HolidayCalendarScreenState extends State<HolidayCalendarScreen> {
                                   content: Text(holiday['name']),
                                   actions: [
                                     TextButton(
-                                        onPressed: () => Navigator.pop(context),
+                                        onPressed: () => NavigationUtils.pop(context),
                                         child: const Text('OK'))
                                   ],
                                 ),

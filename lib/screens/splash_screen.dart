@@ -2,12 +2,13 @@ import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:nutanvij_electricals/screens/auth/login_screen.dart';
+import '../providers/user_provider.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_typography.dart';
-import '../core/utils/responsive.dart';
-import '../providers/user_provider.dart';
+import 'auth/login_screen.dart';
 import 'home/home_screen.dart';
+import '../core/utils/responsive.dart';
+import '../core/utils/navigation_utils.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -63,22 +64,12 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
     if (!mounted) return;
 
-    // Log the user token if user exists
-    if (userProvider.user != null) {
-      print('User token: ${userProvider.user!.token}');
-    }
-
     // Check if user exists and redirect accordingly
     if (userProvider.user != null) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
-      );
+      log(userProvider.user!.token);
+      NavigationUtils.pushReplacement(context, HomeScreen());
     } else {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
-      );
+      NavigationUtils.pushReplacement(context, LoginScreen());
     }
   }
 
