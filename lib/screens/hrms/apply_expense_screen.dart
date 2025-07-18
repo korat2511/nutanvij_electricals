@@ -11,6 +11,7 @@ import '../../widgets/custom_app_bar.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import '../../core/utils/image_picker_utils.dart';
+import '../../core/utils/image_compression_utils.dart';
 
 class ApplyExpenseScreen extends StatefulWidget {
   const ApplyExpenseScreen({Key? key}) : super(key: key);
@@ -42,9 +43,31 @@ class _ApplyExpenseScreenState extends State<ApplyExpenseScreen> {
   }
 
   Future<void> _pickImages() async {
-    final picked = await ImagePickerUtils.pickImage(context: context);
-    if (picked != null) {
-      setState(() => _imagePaths = [picked]);
+    final picked = await ImagePickerUtils.pickMultipleImages(context: context);
+    if (picked.isNotEmpty) {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+
+      try {
+        // Compress images
+        final imageFiles = picked.map((p) => File(p)).toList();
+        final compressedImages = await ImageCompressionUtils.compressImages(imageFiles);
+        
+        setState(() {
+          _imagePaths = compressedImages.map((f) => f.path).toList();
+        });
+      } finally {
+        // Hide loading indicator
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
+      }
     }
   }
 
@@ -155,53 +178,51 @@ class _ApplyExpenseScreenState extends State<ApplyExpenseScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              Text('Images', style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.bold)),
+              Text('Images (Optional)', style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              Row(
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
-                  GestureDetector(
-                    onTap: _imagePaths.isEmpty ? _pickImages : null,
-                    child: Stack(
+                  ..._imagePaths.map((img) => Stack(
+                        alignment: Alignment.topRight,
                       children: [
-                        Container(
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(
-                            border: Border.all(color: AppColors.primary.withOpacity(0.5), width: 2),
-                            borderRadius: BorderRadius.circular(16),
-                            color: Colors.white,
-                          ),
-                          child: _imagePaths.isEmpty
-                              ? const Center(
-                                  child: Icon(Icons.add_a_photo, color: AppColors.primary, size: 32),
-                                )
-                              : ClipRRect(
-                                  borderRadius: BorderRadius.circular(14),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
                                   child: Image.file(
-                                    File(_imagePaths[0]),
-                                    width: 80,
-                                    height: 80,
+                              File(img),
+                              width: 70,
+                              height: 70,
                                     fit: BoxFit.cover,
                                   ),
                                 ),
-                        ),
-                        if (_imagePaths.isNotEmpty)
-                          Positioned(
-                            top: 2,
-                            right: 2,
-                            child: GestureDetector(
-                              onTap: () => setState(() => _imagePaths.clear()),
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _imagePaths.remove(img);
+                              });
+                            },
                               child: Container(
-                                decoration: BoxDecoration(
+                              decoration: const BoxDecoration(
                                   color: Colors.black54,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                padding: const EdgeInsets.all(2),
-                                child: const Icon(Icons.close, color: Colors.white, size: 18),
+                                shape: BoxShape.circle,
                               ),
+                              child: const Icon(Icons.close, color: Colors.white, size: 18),
                             ),
                           ),
                       ],
+                      )),
+                  GestureDetector(
+                    onTap: _pickImages,
+                    child: Container(
+                      width: 70,
+                      height: 70,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.primary),
+                      ),
+                      child: const Icon(Icons.add_a_photo, color: AppColors.primary),
                     ),
                   ),
                 ],

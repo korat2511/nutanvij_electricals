@@ -1,7 +1,8 @@
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:nutanvij_electricals/screens/hrms/apply_expense_screen.dart';
-import 'package:nutanvij_electricals/screens/route/route_screen.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -154,9 +155,17 @@ class _ExpenseRequestListScreenState extends State<ExpenseRequestListScreen> {
     });
   }
 
-  Future<void> _handleExpenseAction(String expenseId, String status) async {
-    String? reason = await _showReasonDialog(context, status);
-    if (reason == null) return;
+  Future<void> _handleExpenseAction(String expenseId, String status, double requestedAmount) async {
+    Map<String, dynamic>? result = await _showApprovalDialog(context, status, requestedAmount);
+    if (result == null) return;
+
+
+    log("RESULT == $result");
+
+
+    final reason = result['reason'] as String;
+    final approvedAmount = result['approvedAmount'] as int;
+    
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     final user = userProvider.user;
     if (user == null) return;
@@ -166,13 +175,18 @@ class _ExpenseRequestListScreenState extends State<ExpenseRequestListScreen> {
       builder: (ctx) => const Center(child: CircularProgressIndicator()),
     );
     try {
-      await ApiService().employeeExpenseRequestAction(
+      var data = await ApiService().employeeExpenseRequestAction(
         context: context,
         apiToken: user.data.apiToken,
         expenseId: expenseId,
+        approvedAmount: approvedAmount,
         status: status,
         reason: reason,
       );
+
+
+      log("Data == $data");
+
       Navigator.of(context).pop();
       SnackBarUtils.showSuccess(context, 'Expense $status successfully');
       await _fetchRequests();
@@ -182,7 +196,41 @@ class _ExpenseRequestListScreenState extends State<ExpenseRequestListScreen> {
     }
   }
 
+  Future<bool> _showCancelConfirmationDialog(BuildContext context) async {
+    return await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          title: const Text('Cancel Expense Request'),
+          content: const Text(
+            'Are you sure you want to cancel this expense request? This action cannot be undone.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('No, Keep It'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Yes, Cancel'),
+            ),
+          ],
+        );
+      },
+    ) ?? false;
+  }
+
   Future<void> _cancelRequest(String expenseId) async {
+    // Show confirmation dialog first
+    final shouldCancel = await _showCancelConfirmationDialog(context);
+    if (!shouldCancel) return;
+    
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     final user = userProvider.user;
     if (user == null) return;
@@ -206,30 +254,59 @@ class _ExpenseRequestListScreenState extends State<ExpenseRequestListScreen> {
     }
   }
 
-  Future<String?> _showReasonDialog(BuildContext context, String action) async {
-    final TextEditingController controller = TextEditingController();
-    String? errorText;
-    return await showDialog<String>(
+  Future<Map<String, dynamic>?> _showApprovalDialog(BuildContext context, String action, double requestedAmount) async {
+    final TextEditingController reasonController = TextEditingController();
+    final TextEditingController amountController = TextEditingController();
+    String? reasonErrorText;
+    String? amountErrorText;
+    
+    return await showDialog<Map<String, dynamic>>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
+              backgroundColor: Colors.white,
               title: Text('$action Expense'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (action.toLowerCase() == 'approved') ...[
+                    Text('Requested Amount: ₹${requestedAmount.toStringAsFixed(2)}'),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: amountController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'Approved Amount (₹)',
+                        errorText: amountErrorText,
+                        border: const OutlineInputBorder(),
+                        prefixText: '₹',
+                      ),
+                      onChanged: (value) {
+                        if (amountErrorText != null) {
+                          setState(() => amountErrorText = null);
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   const Text('Please enter a note (reason) for this action:'),
                   const SizedBox(height: 12),
                   TextField(
-                    controller: controller,
+                    controller: reasonController,
                     maxLines: 3,
                     decoration: InputDecoration(
                       labelText: 'Reason',
-                      errorText: errorText,
+                      errorText: reasonErrorText,
                       border: const OutlineInputBorder(),
                     ),
+                    onChanged: (value) {
+                      if (reasonErrorText != null) {
+                        setState(() => reasonErrorText = null);
+                      }
+                    },
                   ),
                 ],
               ),
@@ -240,10 +317,44 @@ class _ExpenseRequestListScreenState extends State<ExpenseRequestListScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    if (controller.text.trim().isEmpty) {
-                      setState(() => errorText = 'Reason is required');
-                    } else {
-                      Navigator.of(ctx).pop(controller.text.trim());
+                    bool isValid = true;
+                    
+                    // Validate reason
+                    if (reasonController.text.trim().isEmpty) {
+                      setState(() => reasonErrorText = 'Reason is required');
+                      isValid = false;
+                    }
+                    
+                    // Validate approved amount for approval action
+                    if (action.toLowerCase() == 'approved') {
+                      if (amountController.text.trim().isEmpty) {
+                        setState(() => amountErrorText = 'Approved amount is required');
+                        isValid = false;
+                      } else {
+                        try {
+                          final approvedAmount = double.parse(amountController.text.trim());
+                          if (approvedAmount <= 0) {
+                            setState(() => amountErrorText = 'Approved amount must be greater than 0. Use reject if you want to reject the expense.');
+                            isValid = false;
+                          } else if (approvedAmount > requestedAmount) {
+                            setState(() => amountErrorText = 'Approved amount cannot be greater than requested amount (₹${requestedAmount.toStringAsFixed(2)})');
+                            isValid = false;
+                          }
+                        } catch (e) {
+                          setState(() => amountErrorText = 'Please enter a valid amount');
+                          isValid = false;
+                        }
+                      }
+                    }
+                    
+                    if (isValid) {
+                      final result = {
+                        'reason': reasonController.text.trim(),
+                        'approvedAmount': action.toLowerCase() == 'approved' 
+                            ? int.parse(amountController.text.trim())
+                            : 0,
+                      };
+                      Navigator.of(ctx).pop(result);
                     }
                   },
                   child: Text(action),
@@ -463,14 +574,19 @@ class _ExpenseRequestListScreenState extends State<ExpenseRequestListScreen> {
                                           mainAxisAlignment:
                                               MainAxisAlignment.spaceBetween,
                                           children: [
-                                            Text(
-                                                widget.isAllUsers
-                                                    ? (userInfo['name'] ?? '-')
-                                                    : (req['title'] ?? '-'),
-                                                style: AppTypography.titleMedium
-                                                    .copyWith(
-                                                        fontWeight:
-                                                            FontWeight.bold)),
+                                            Container(
+                                              width: 230,
+                                              child: Text(
+                                                  widget.isAllUsers
+                                                      ? (userInfo['name'] ?? '-')
+                                                      : (req['title'] ?? '-'),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: AppTypography.titleMedium
+                                                      .copyWith(
+                                                          fontWeight:
+                                                              FontWeight.bold)),
+                                            ),
                                             Container(
                                               padding:
                                                   const EdgeInsets.symmetric(
@@ -502,6 +618,11 @@ class _ExpenseRequestListScreenState extends State<ExpenseRequestListScreen> {
                                               'Title', req['title'] ?? '-'),
                                         _infoRow(
                                             'Amount', req['amount'] ?? '-'),
+                                        if (isApproved && req['approved_amount'] != null)
+                                          _infoRow(
+                                            'Approved Amount', 
+                                            req['approved_amount'].toString(),
+                                            valueColor: Colors.green),
                                         _infoRow('Description', reason),
                                         _infoRow(
                                             'Expense Date', expenseDateLabel),
@@ -584,9 +705,11 @@ class _ExpenseRequestListScreenState extends State<ExpenseRequestListScreen> {
                                                     size: 32),
                                                 onPressed: () async {
                                                   if (reason.isNotEmpty) {
+                                                    final requestedAmount = double.tryParse((req['amount'] ?? '0').toString()) ?? 0.0;
                                                     await _handleExpenseAction(
                                                         req['id'].toString(),
-                                                        'Rejected');
+                                                        'Rejected',
+                                                        requestedAmount);
                                                   }
                                                 },
                                                 tooltip: 'Reject',
@@ -599,9 +722,11 @@ class _ExpenseRequestListScreenState extends State<ExpenseRequestListScreen> {
                                                     size: 32),
                                                 onPressed: () async {
                                                   if (reason.isNotEmpty) {
+                                                    final requestedAmount = double.tryParse((req['amount'] ?? '0').toString()) ?? 0.0;
                                                     await _handleExpenseAction(
                                                         req['id'].toString(),
-                                                        'Approved');
+                                                        'Approved',
+                                                        requestedAmount);
                                                   }
                                                 },
                                                 tooltip: 'Approve',

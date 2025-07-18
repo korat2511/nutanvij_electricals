@@ -100,7 +100,7 @@ class AppTheme {
       labelStyle: AppTypography.bodyMedium,
       hintStyle: AppTypography.bodyMedium.copyWith(color: AppColors.textHint),
     ),
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       color: Colors.white,
       elevation: 2,
       shape: RoundedRectangleBorder(

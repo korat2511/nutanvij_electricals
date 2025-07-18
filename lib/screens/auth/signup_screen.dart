@@ -18,7 +18,8 @@ import '../../widgets/custom_button.dart';
 import '../../core/utils/navigation_utils.dart';
 
 class SignupScreen extends StatefulWidget {
-  const SignupScreen({super.key});
+  final bool isFromCreateUser;
+  const SignupScreen({super.key, this.isFromCreateUser = false});
 
   @override
   State<SignupScreen> createState() => _SignupScreenState();
@@ -54,6 +55,7 @@ class _SignupScreenState extends State<SignupScreen> {
   List<Department> _departments = [];
   bool _isLoadingDesignations = true;
   bool _isLoadingDepartments = true;
+  bool _hasUserKeypadMobile = false;
 
   final List<String> _genders = ['Male', 'Female', 'Other'];
 
@@ -183,7 +185,43 @@ class _SignupScreenState extends State<SignupScreen> {
 
     try {
       Provider.of<UserProvider>(context, listen: false).setLoading(true);
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final loggedInUser = userProvider.user;
 
+      if (widget.isFromCreateUser) {
+        // Call createUser API
+        await _apiService.createUser(
+          context: context,
+          name: _nameController.text,
+          mobile: _mobileController.text,
+          email: _emailController.text,
+          password: _passwordController.text,
+          designationId: _selectedDesignation!,
+          subDepartmentId: _selectedSubDepartment!,
+          createdBy: loggedInUser?.data.id ?? 0,
+          hasKeypadMobile: _hasUserKeypadMobile ? 1 : 0,
+          address: _addressController.text,
+          dateOfBirth: _dobController.text,
+          gender: _selectedGender,
+          emergencyContact: _emergencyContactController.text,
+          profileImagePath: _profileImagePath != null && _profileImagePath!.isNotEmpty ? File(_profileImagePath!) : null,
+          bankAccountNo: _bankAccountController.text,
+          bankName: _bankNameController.text,
+          ifscCode: _ifscController.text,
+          panCardNo: _panController.text,
+          aadharCardNo: _aadharController.text,
+          aadharCardFront: _aadharFrontImagePath != null && _aadharFrontImagePath!.isNotEmpty ? File(_aadharFrontImagePath!) : null,
+          aadharCardBack: _aadharBackImagePath != null && _aadharBackImagePath!.isNotEmpty ? File(_aadharBackImagePath!) : null,
+          panCardImage: _panCardImagePath != null && _panCardImagePath!.isNotEmpty ? File(_panCardImagePath!) : null,
+          passbookImage: _passbookImagePath != null && _passbookImagePath!.isNotEmpty ? File(_passbookImagePath!) : null,
+          salary: _salaryController.text,
+          dateOfJoining: _dateOfJoiningController.text,
+        );
+        if (!mounted) return;
+        SnackBarUtils.showSuccess(context, 'User created successfully');
+        NavigationUtils.pop(context); // Go back after creating user
+      } else {
+        // Call signup API as before
       final user = await _apiService.signup(
         name: _nameController.text,
         email: _emailController.text,
@@ -206,19 +244,15 @@ class _SignupScreenState extends State<SignupScreen> {
         aadharCardBack: _aadharBackImagePath != null && _aadharBackImagePath!.isNotEmpty ? File(_aadharBackImagePath!) : null,
         panCardImage: _panCardImagePath != null && _panCardImagePath!.isNotEmpty ? File(_panCardImagePath!) : null,
         passbookImage: _passbookImagePath != null && _passbookImagePath!.isNotEmpty ? File(_passbookImagePath!) : null,
-
         salary: _salaryController.text,
         dateOfJoining: _dateOfJoiningController.text,
         context: context,
       );
-
       if (!mounted) return;
-
-      // Show success message and navigate to login
       SnackBarUtils.showSuccess(context, 'Account created successfully');
       NavigationUtils.pushReplacement(context, const LoginScreen());
+      }
     } on ApiException catch (e) {
-      if (!mounted) return;
       SnackBarUtils.showError(context, e.message);
     } catch (e) {
       if (!mounted) return;
@@ -231,6 +265,57 @@ class _SignupScreenState extends State<SignupScreen> {
         Provider.of<UserProvider>(context, listen: false).setLoading(false);
       }
     }
+  }
+
+  String? _validateName(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Name is required';
+    }
+    return null;
+  }
+
+  String? _validateMobile(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Mobile number is required';
+    }
+    if (!RegExp(r'^[0-9]{10}$').hasMatch(value)) {
+      return 'Please enter a valid 10-digit mobile number';
+    }
+    return null;
+  }
+
+  String? _validateEmail(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Email is required';
+    }
+    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+      return 'Please enter a valid email address';
+    }
+    return null;
+  }
+
+  String? _validatePassword(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Password is required';
+    }
+    if (value.length < 6) {
+      return 'Password must be at least 6 characters';
+    }
+    return null;
+  }
+
+  String? _validateDesignation(int? value) {
+    if (widget.isFromCreateUser && value == null) {
+      return 'Designation is required';
+    }
+    return null;
+  }
+
+  String? _validateSubDepartment(int? value) {
+    if (widget.isFromCreateUser && value == null) {
+      return 'Sub Department is required';
+    }
+    return null;
   }
 
   @override
@@ -280,8 +365,8 @@ class _SignupScreenState extends State<SignupScreen> {
 
                   Center(
                     child: Text(
-                      'Create Account',
-                      style: AppTypography.headlineLarge.copyWith(
+                      widget.isFromCreateUser ? 'Create Manual User' : 'Create Account',
+                      style: AppTypography.headlineMedium.copyWith(
                         color: AppColors.primary,
                         fontWeight: FontWeight.w600,
                       ),
@@ -301,8 +386,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     controller: _nameController,
                     label: 'Full Name',
                     maxLines: 1,
-
-                    validator: (value) => value == null || value.isEmpty ? 'Please enter your name' : null,
+                    validator: _validateName,
                   ),
                   SizedBox(height: Responsive.responsiveValue(context: context, mobile: 14, tablet: 20)),
                   CustomTextField(
@@ -310,14 +394,14 @@ class _SignupScreenState extends State<SignupScreen> {
                     label: 'Mobile Number',
                     keyboardType: TextInputType.phone,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)],
-                    validator: (value) => value == null || value.isEmpty ? 'Please enter your mobile number' : value.length != 10 ? 'Mobile number must be 10 digits' : null,
+                    validator: _validateMobile,
                   ),
                   SizedBox(height: Responsive.responsiveValue(context: context, mobile: 14, tablet: 20)),
                   CustomTextField(
                     controller: _emailController,
                     label: 'Email',
                     keyboardType: TextInputType.emailAddress,
-                    validator: (value) => value == null || value.isEmpty ? 'Please enter your email' : (!value.contains('@') || !value.contains('.')) ? 'Please enter a valid email' : null,
+                    validator: _validateEmail,
                   ),
                   SizedBox(height: Responsive.responsiveValue(context: context, mobile: 14, tablet: 20)),
                   CustomTextField(
@@ -329,18 +413,24 @@ class _SignupScreenState extends State<SignupScreen> {
                       icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
                       onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                     ),
-                    validator: (value) => value == null || value.isEmpty ? 'Please enter a password' : value.length < 6 ? 'Password must be at least 6 characters' : null,
+                    validator: _validatePassword,
                   ),
                   SizedBox(height: Responsive.responsiveValue(context: context, mobile: 14, tablet: 20)),
                   // Designation Dropdown
                   _isLoadingDesignations
-                      ? PerfectDropdownField<int>(
-                          label: 'Designation',
-                          value: null,
-                          items: const [],
-                          itemLabel: (id) => '',
-                          onChanged: (_) {},
-                          validator: (_) => 'Loading...',
+                      ? const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8.0),
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                              SizedBox(width: 12),
+                              Text('Loading designations...'),
+                            ],
+                          ),
                         )
                       : PerfectDropdownField<int>(
                           label: 'Designation',
@@ -348,18 +438,24 @@ class _SignupScreenState extends State<SignupScreen> {
                           items: _designations.map((d) => d.id).toList(),
                           itemLabel: (id) => _designations.firstWhere((d) => d.id == id).name,
                           onChanged: (val) => setState(() => _selectedDesignation = val),
-                          validator: (value) => value == null ? 'Please select a designation' : null,
+                          validator: _validateDesignation,
                         ),
                   SizedBox(height: Responsive.responsiveValue(context: context, mobile: 14, tablet: 20)),
                   // Department Dropdown
                   _isLoadingDepartments
-                      ? PerfectDropdownField<int>(
-                          label: 'Department',
-                          value: null,
-                          items: const [],
-                          itemLabel: (id) => '',
-                          onChanged: (_) {},
-                          validator: (_) => 'Loading...',
+                      ? const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8.0),
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                              SizedBox(width: 12),
+                              Text('Loading departments...'),
+                            ],
+                          ),
                         )
                       : PerfectDropdownField<int>(
                           label: 'Department',
@@ -395,7 +491,7 @@ class _SignupScreenState extends State<SignupScreen> {
                               .firstWhere((sd) => sd.id == id)
                               .name,
                           onChanged: (val) => setState(() => _selectedSubDepartment = val),
-                          validator: (value) => value == null ? 'Please select a sub department' : null,
+                          validator: _validateSubDepartment,
                         ),
                       ],
                     ),
@@ -453,7 +549,22 @@ class _SignupScreenState extends State<SignupScreen> {
                       FilteringTextInputFormatter.digitsOnly,
                       LengthLimitingTextInputFormatter(10),
                     ],
-
+                  ),
+                  SizedBox(height: Responsive.responsiveValue(context: context, mobile: 14, tablet: 20)),
+                  // Checkbox for Keypad Mobile
+                  if (widget.isFromCreateUser)
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: _hasUserKeypadMobile,
+                          onChanged: (val) {
+                            setState(() {
+                              _hasUserKeypadMobile = val ?? false;
+                            });
+                          },
+                        ),
+                        const Text('User has Keypad Mobile'),
+                      ],
                   ),
                   SizedBox(height: Responsive.responsiveValue(context: context, mobile: 24, tablet: 36)),
                   // SECTION: Bank Details
@@ -538,7 +649,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     text: 'Create Account',
                   ),
                   SizedBox(height: Responsive.responsiveValue(context: context, mobile: 14, tablet: 20)),
-                  Center(
+                if(widget.isFromCreateUser == false) Center(
                     child: TextButton(
                       onPressed: () {
                         NavigationUtils.pushReplacement(context, const LoginScreen());

@@ -11,6 +11,9 @@ import '../screens/auth/login_screen.dart';
 import '../providers/user_provider.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
+import '../models/task.dart' hide Tag;
+import 'package:file_picker/file_picker.dart';
+import '../models/tag.dart';
 
 class ApiException implements Exception {
   final String message;
@@ -127,6 +130,7 @@ class ApiService {
       );
     } catch (e) {
       if (e is ApiException) rethrow;
+      log("E == $e");
       throw ApiException(
         'An unexpected error occurred. Please try again.',
         statusCode: 0,
@@ -284,6 +288,11 @@ class ApiService {
         Uri.parse('$baseUrl/attendanceCheck'),
         body: {'api_token': apiToken},
       );
+
+
+      log("Attendance response body == ${response.body}");
+      log("Attendance response body == ${response.statusCode}");
+
       return _handleResponse(response, context);
     });
   }
@@ -297,6 +306,7 @@ class ApiService {
     required String address,
     String? checkInDescription,
     String? imagePath,
+    int? siteId,
   }) async {
     return _handleNetworkCall(() async {
       var request = http.MultipartRequest('POST', Uri.parse('$baseUrl/saveAttendance'));
@@ -305,6 +315,7 @@ class ApiService {
       request.fields['latitude'] = latitude;
       request.fields['longitude'] = longitude;
       request.fields['address'] = address;
+      if (siteId != null) request.fields['site_id'] = siteId.toString();
       if (checkInDescription != null) request.fields['check_in_description'] = checkInDescription;
       if (imagePath != null) {
         request.files.add(await http.MultipartFile.fromPath('image', imagePath));
@@ -321,6 +332,7 @@ class ApiService {
     required String startDate,
     required String endDate,
     required String userId,
+    int page = 1,
   }) async {
     return _handleNetworkCall(() async {
       final response = await http.post(
@@ -330,10 +342,11 @@ class ApiService {
           'start_date': startDate,
           'end_date': endDate,
           'user_id': userId,
+          'page': page.toString(),
         },
       );
       final data = _handleResponse(response, context);
-          return List<Map<String, dynamic>>.from(data['data']);
+      return List<Map<String, dynamic>>.from(data['data']);
     });
   }
 
@@ -658,18 +671,21 @@ class ApiService {
     });
   }
 
-  Future<void> employeeExpenseRequestAction({
+  Future<dynamic> employeeExpenseRequestAction({
     required BuildContext context,
     required String apiToken,
     required String expenseId,
+    required int approvedAmount,
     required String status,
     String? reason,
   }) async {
     return _handleNetworkCall(() async {
       final body = {
         'api_token': apiToken,
+        'approved_amount' : approvedAmount.toString(),
         'employee_expense_id': expenseId,
         'status': status,
+
       };
       if (reason != null && reason.isNotEmpty) {
         body['admin_reason'] = reason;
@@ -678,6 +694,10 @@ class ApiService {
         Uri.parse('$baseUrl/employeeExpenseRequestAction'),
         body: body,
       );
+
+
+      log("RES == ${response.body}");
+
       _handleResponse(response, context);
     });
   }
@@ -744,6 +764,8 @@ class ApiService {
     required String company,
     required String startDate,
     required String endDate,
+    required int minRange,
+    required int maxRange,
     required List<String> imagePaths,
   }) async {
     return _handleNetworkCall(() async {
@@ -757,6 +779,8 @@ class ApiService {
       request.fields['company'] = company;
       request.fields['start_date'] = startDate;
       request.fields['end_date'] = endDate;
+      request.fields['min_range'] = minRange.toString();
+      request.fields['max_range'] = maxRange.toString();
       for (var img in imagePaths) {
         request.files.add(await http.MultipartFile.fromPath('images[]', img));
       }
@@ -765,6 +789,51 @@ class ApiService {
 
 
       log("Create site response == ${response.body}");
+
+      _handleResponse(response, context);
+    });
+  }
+
+  Future<void> updateSite({
+    required BuildContext context,
+    required String apiToken,
+    required int siteId,
+    required String name,
+    required String latitude,
+    required String longitude,
+    required String address,
+    required String company,
+    required String startDate,
+    required String endDate,
+    required int minRange,
+    required int maxRange,
+    required List<String> newImagePaths,
+    required List<int> existingImageIds,
+  }) async {
+    return _handleNetworkCall(() async {
+      var uri = Uri.parse('$baseUrl/updateSite');
+      var request = http.MultipartRequest('POST', uri);
+      request.fields['api_token'] = apiToken;
+      request.fields['id'] = siteId.toString();
+      request.fields['name'] = name;
+      request.fields['latitude'] = latitude;
+      request.fields['longitude'] = longitude;
+      request.fields['address'] = address;
+      request.fields['company'] = company;
+      request.fields['start_date'] = startDate;
+      request.fields['end_date'] = endDate;
+      request.fields['min_range'] = minRange.toString();
+      request.fields['max_range'] = maxRange.toString();
+
+      
+      for (var img in newImagePaths) {
+        request.files.add(await http.MultipartFile.fromPath('images[]', img));
+      }
+      
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
+
+      log("Update site response == ${response.body}");
 
       _handleResponse(response, context);
     });
@@ -805,6 +874,396 @@ class ApiService {
         },
       );
       _handleResponse(response, context);
+    });
+  }
+
+  Future<UserModel> createUser({
+    required BuildContext context,
+    required String name,
+    required String mobile,
+    required String email,
+    required String password,
+    required int designationId,
+    required int subDepartmentId,
+    required int createdBy,
+    required int hasKeypadMobile,
+    String? address,
+    String? dateOfBirth,
+    String? gender,
+    String? emergencyContact,
+    File? profileImagePath,
+    String? bankAccountNo,
+    String? bankName,
+    String? ifscCode,
+    String? panCardNo,
+    String? aadharCardNo,
+    File? aadharCardFront,
+    File? aadharCardBack,
+    File? panCardImage,
+    File? passbookImage,
+    String? salary,
+    String? dateOfJoining,
+  }) async {
+    return _handleNetworkCall(() async {
+      // Input validation (only required fields)
+      if (name.isEmpty) throw ApiException('Name is required', statusCode: 400);
+      if (mobile.isEmpty) throw ApiException('Mobile number is required', statusCode: 400);
+      if (email.isEmpty) throw ApiException('Email is required', statusCode: 400);
+      if (password.isEmpty) throw ApiException('Password is required', statusCode: 400);
+      if (designationId == 0) throw ApiException('Designation is required', statusCode: 400);
+      if (subDepartmentId == 0) throw ApiException('Sub Department is required', statusCode: 400);
+
+      var request = http.MultipartRequest('POST', Uri.parse('$baseUrl/create-user'));
+      request.fields.addAll({
+        'name': name,
+        'mobile': mobile,
+        'email': email,
+        'password': password,
+        'designation_id': designationId.toString(),
+        'sub_department_id': subDepartmentId.toString(),
+        'created_by': createdBy.toString(),
+        'has_keypad_mobile': hasKeypadMobile.toString(),
+      });
+      // Add optional fields
+      if (address != null && address.isNotEmpty) request.fields['address'] = address;
+      if (dateOfBirth != null && dateOfBirth.isNotEmpty) request.fields['dob'] = dateOfBirth;
+      if (gender != null && gender.isNotEmpty) request.fields['gender'] = gender;
+      if (emergencyContact != null && emergencyContact.isNotEmpty) request.fields['emergency_contact'] = emergencyContact;
+      if (salary != null) request.fields['salary'] = salary;
+      if (dateOfJoining != null) request.fields['date_of_joining'] = dateOfJoining;
+      if (bankAccountNo != null && bankAccountNo.isNotEmpty) request.fields['bank_account_no'] = bankAccountNo;
+      if (bankName != null && bankName.isNotEmpty) request.fields['bank_name'] = bankName;
+      if (ifscCode != null && ifscCode.isNotEmpty) request.fields['ifsc_code'] = ifscCode;
+      if (panCardNo != null && panCardNo.isNotEmpty) request.fields['pan_card_no'] = panCardNo;
+      if (aadharCardNo != null && aadharCardNo.isNotEmpty) request.fields['aadhar_card_no'] = aadharCardNo;
+      // Add files
+      if (profileImagePath != null) {
+        request.files.add(await http.MultipartFile.fromPath('profile_image', profileImagePath.path));
+      }
+      if (aadharCardFront != null) {
+        request.files.add(await http.MultipartFile.fromPath('addhar_card_front', aadharCardFront.path));
+      }
+      if (aadharCardBack != null) {
+        request.files.add(await http.MultipartFile.fromPath('addhar_card_back', aadharCardBack.path));
+      }
+      if (panCardImage != null) {
+        request.files.add(await http.MultipartFile.fromPath('pan_card_image', panCardImage.path));
+      }
+      if (passbookImage != null) {
+        request.files.add(await http.MultipartFile.fromPath('passbook_image', passbookImage.path));
+      }
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
+      final data = _handleResponse(response, context);
+      return UserModel.fromJson(data);
+    });
+  }
+
+  Future<Site> getUserBySite({
+    required BuildContext context,
+    required String apiToken,
+    required int siteId,
+    int? designationId,
+    int? hasKeypadMobile,
+  }) async {
+    final body = {
+      'api_token': apiToken,
+      'site_id': siteId.toString(),
+    };
+    if (designationId != null) body['designation_id'] = designationId.toString();
+    if (hasKeypadMobile != null) body['has_keypad_mobile'] = hasKeypadMobile.toString();
+
+    final response = await http.post(
+      Uri.parse('$baseUrl/getUserBySite'),
+      body: body,
+    );
+    final data = _handleResponse(response, context);
+    return Site.fromJson(data['data']);
+  }
+
+  Future<dynamic> attendanceForOtherUser({
+    required BuildContext context,
+    required String apiToken,
+    required String type, // 'check_in' or 'check_out'
+    required List<int> userIds,
+    required String latitude,
+    required String longitude,
+    required String address,
+    String? checkInDescription,
+    int? siteId,
+  }) async {
+    return _handleNetworkCall(() async {
+      final response = await http.post(
+        Uri.parse('$baseUrl/attendanceForOtherUser'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'api_token': apiToken,
+          'type': type,
+          'user_id': userIds,
+          'site_id' : siteId.toString(),
+          'latitude': latitude,
+          'longitude': longitude,
+          'address': address,
+          'check_in_description': checkInDescription,
+        }),
+      );
+
+
+      log("R == ${response.body}");
+
+      _handleResponse(response, context);
+    });
+  }
+
+  Future<void> deleteSiteImage({
+    required BuildContext context,
+    required String apiToken,
+    required int imageId,
+  }) async {
+    return _handleNetworkCall(() async {
+      final response = await http.post(
+        Uri.parse('$baseUrl/deleteSiteImage'),
+        body: {
+          'api_token': apiToken,
+          'image_id': imageId.toString(),
+        },
+      );
+      _handleResponse(response, context);
+    });
+  }
+
+  Future<void> pinSite({
+    required BuildContext context,
+    required String apiToken,
+    required int siteId,
+  }) async {
+    return _handleNetworkCall(() async {
+      final response = await http.post(
+        Uri.parse('$baseUrl/pinSite'),
+        body: {
+          'api_token': apiToken,
+          'site_id': siteId.toString(),
+        },
+      );
+      _handleResponse(response, context);
+    });
+  }
+
+  Future<List<Task>> getTaskList({
+    required BuildContext context,
+    required String apiToken,
+    int page = 1,
+    required int siteId,
+    int? userId,
+    String? status,
+    String? tags,
+    String? search,
+  }) async {
+    return _handleNetworkCall(() async {
+      final response = await http.post(
+        Uri.parse('$baseUrl/getTask'),
+        body: {
+          'api_token': apiToken,
+          'page': page.toString(),
+          'site_id': siteId.toString(),
+          if (userId != null) 'user_id': userId.toString(),
+          if (status != null) 'status': status,
+          if (tags != null) 'tags_id': tags,
+          if (search != null) 'search': search,
+        },
+      );
+      final data = _handleResponse(response, context);
+      final List<dynamic> tasksJson = data['data'] ?? [];
+      return tasksJson.map((json) => Task.fromJson(json)).toList();
+    });
+  }
+
+  Future<Task> getTaskDetail({
+    required BuildContext context,
+    required String apiToken,
+    required int taskId,
+  }) async {
+    return _handleNetworkCall(() async {
+      final response = await http.post(
+        Uri.parse('$baseUrl/getTaskDetail'),
+        body: {
+          'api_token': apiToken,
+          'task_id': taskId.toString(),
+        },
+      );
+      final data = _handleResponse(response, context);
+
+      return Task.fromJson(data['data']);
+    });
+  }
+
+  Future<dynamic> createTask({
+    required String apiToken,
+    required int siteId,
+    required String name,
+    required String startDate,
+    required String endDate,
+    required String assignTo,
+    required String tags,
+    required List<File> taskImages,
+    required List<File> taskAttachments,
+  }) async {
+    var request = http.MultipartRequest('POST', Uri.parse('$baseUrl/createTask'));
+    request.fields['api_token'] = apiToken;
+    request.fields['site_id'] = siteId.toString();
+    request.fields['name'] = name;
+    request.fields['start_date'] = startDate;
+    request.fields['end_date'] = endDate;
+    request.fields['assign_to'] = assignTo;
+    request.fields['tags'] = tags;
+
+    for (var imageFile in taskImages) {
+      var file = await http.MultipartFile.fromPath("task_images[]", imageFile.path);
+      request.files.add(file);
+    }
+    for (var att in taskAttachments) {
+      var file = await http.MultipartFile.fromPath("task_attachments[]", att.path);
+      request.files.add(file);
+    }
+
+
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+    final data = _handleResponse(response, null);
+    return data;
+  }
+
+  Future<List<Tag>> getTags({required String apiToken}) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/getTag'),
+      body: {'api_token': apiToken},
+    );
+    final data = _handleResponse(response, null);
+    final List<dynamic> tagsJson = data['data'] ?? [];
+    return tagsJson.map((json) => Tag.fromJson(json)).toList();
+  }
+
+  Future<Tag> addTag({required String apiToken, required String name}) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/addTag'),
+      body: {'api_token': apiToken, 'name': name},
+    );
+    final data = _handleResponse(response, null);
+    return Tag.fromJson(data['data']);
+  }
+
+  Future<dynamic> editTask({
+    required String apiToken,
+    required int siteId,
+    required int taskId,
+    required String name,
+    required String startDate,
+    required String endDate,
+    required String assignTo,
+    required String tags,
+    required List<File> taskImages,
+    required List<File> taskAttachments,
+  }) async {
+    var request = http.MultipartRequest('POST', Uri.parse('$baseUrl/editTask'));
+    request.fields['api_token'] = apiToken;
+    request.fields['site_id'] = siteId.toString();
+    request.fields['task_id'] = taskId.toString();
+    request.fields['name'] = name;
+    request.fields['start_date'] = startDate;
+    request.fields['end_date'] = endDate;
+    request.fields['assign_to'] = assignTo;
+    request.fields['tags'] = tags;
+
+
+    log("TSK IMAGES == $taskImages");
+
+
+    for (var imageFile in taskImages) {
+      var file = await http.MultipartFile.fromPath("task_images[]", imageFile.path);
+      request.files.add(file);
+    }
+    for (var att in taskAttachments) {
+      var file = await http.MultipartFile.fromPath("task_attachments[]", att.path);
+      request.files.add(file);
+    }
+
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+
+
+    log("Response == ${response.body}");
+
+    final data = _handleResponse(response, null);
+    return data;
+  }
+
+  Future<dynamic> updateTaskProgress({
+    required String apiToken,
+    required int taskId,
+    required String workDone,
+    required String workLeft,
+    required String unit,
+    String? remark,
+    List<File>? images,
+    List<File>? attachments,
+  }) async {
+    var request = http.MultipartRequest('POST', Uri.parse('$baseUrl/updateProgress'));
+    request.fields['api_token'] = apiToken;
+    request.fields['task_id'] = taskId.toString();
+    request.fields['work_done'] = workDone;
+    request.fields['work_left'] = workLeft;
+    request.fields['unit'] = unit;
+    if (remark != null && remark.isNotEmpty) {
+      request.fields['remark'] = remark;
+    }
+
+    if (images != null) {
+      for (var imageFile in images) {
+        var file = await http.MultipartFile.fromPath("images[]", imageFile.path);
+        request.files.add(file);
+      }
+    }
+
+    if (attachments != null) {
+      for (var attachmentFile in attachments) {
+        var file = await http.MultipartFile.fromPath("attachments[]", attachmentFile.path);
+        request.files.add(file);
+      }
+    }
+
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+    final data = _handleResponse(response, null);
+    return data;
+  }
+
+  Future<Map<String, dynamic>> forgotPassword(String email) async {
+    return _handleNetworkCall(() async {
+      final response = await http.post(
+        Uri.parse('$baseUrl/forgotPassword'),
+        body: {
+          'email': email,
+        },
+      );
+      return _handleResponse(response, null);
+    });
+  }
+
+  Future<Map<String, dynamic>> resetPassword({
+    required String apiToken,
+    required String newPassword,
+    required String confirmPassword,
+  }) async {
+    return _handleNetworkCall(() async {
+      final response = await http.post(
+        Uri.parse('$baseUrl/resetPassword'),
+        body: {
+          'api_token': apiToken,
+          'new_password': newPassword,
+          'confirm_password': confirmPassword,
+        },
+      );
+      return _handleResponse(response, null);
     });
   }
 

@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_typography.dart';
 import '../services/location_service.dart';
+import '../core/utils/snackbar_utils.dart';
 
 class AttendanceCard extends StatefulWidget {
   final String? checkInTime;
@@ -30,6 +31,9 @@ class AttendanceCard extends StatefulWidget {
 
 class _AttendanceCardState extends State<AttendanceCard> {
   String _address = 'Getting location...';
+  bool _isLoadingLocation = true;
+  LocationErrorType? _locationErrorType;
+  String? _locationErrorMessage;
 
   @override
   void initState() {
@@ -38,12 +42,185 @@ class _AttendanceCardState extends State<AttendanceCard> {
   }
 
   Future<void> _getCurrentAddress() async {
-    final address = await LocationService.getCurrentAddress();
+    setState(() {
+      _isLoadingLocation = true;
+      _locationErrorType = null;
+      _locationErrorMessage = null;
+    });
+
+    final result = await LocationService.getCurrentAddressWithRetry();
+    
     if (mounted) {
       setState(() {
-        _address = address;
+        _isLoadingLocation = false;
+        if (result.isSuccess) {
+          _address = result.address!;
+        } else if (result.hasError) {
+          _address = 'Address not available';
+          _locationErrorType = result.errorType;
+          _locationErrorMessage = result.errorMessage;
+          
+          // Start location service check if location service is disabled
+          if (result.errorType == LocationErrorType.locationServiceDisabled) {
+            _startLocationServiceCheck();
+          }
+        } else {
+          _address = result.address ?? 'Address not available';
+        }
       });
     }
+  }
+
+  Future<void> _handleLocationRetry() async {
+    if (_locationErrorType == LocationErrorType.permissionDenied) {
+      // Request permission again
+      try {
+        await LocationService.getCurrentPosition();
+        await _getCurrentAddress();
+      } catch (e) {
+        if (mounted) {
+          SnackBarUtils.showError(context, 'Location permission denied. Please grant permission in settings.');
+        }
+      }
+    } else if (_locationErrorType == LocationErrorType.permissionDeniedForever) {
+      if (mounted) {
+        SnackBarUtils.showError(context, 'Location permission is permanently denied. Please enable it in device settings.');
+      }
+    } else if (_locationErrorType == LocationErrorType.locationServiceDisabled) {
+      // Check if location service is now enabled
+      try {
+        final isEnabled = await LocationService.isLocationServiceEnabled();
+        if (isEnabled) {
+          // Location service is now enabled, try to get location
+          await _getCurrentAddress();
+        } else {
+          if (mounted) {
+            SnackBarUtils.showError(context, 'Location services are still disabled. Please enable location services in your device settings.');
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          SnackBarUtils.showError(context, 'Failed to check location service status. Please try again.');
+        }
+      }
+    } else {
+      // For other errors, just retry
+      await _getCurrentAddress();
+    }
+  }
+
+  void _startLocationServiceCheck() {
+    // Check location service status every 2 seconds when there's an error
+    if (_locationErrorType == LocationErrorType.locationServiceDisabled) {
+      Future.delayed(const Duration(seconds: 2), () async {
+        if (mounted && _locationErrorType == LocationErrorType.locationServiceDisabled) {
+          try {
+            final isEnabled = await LocationService.isLocationServiceEnabled();
+            if (isEnabled) {
+              // Location service is now enabled, try to get location
+              await _getCurrentAddress();
+            } else {
+              // Continue checking
+              _startLocationServiceCheck();
+            }
+          } catch (e) {
+            // Continue checking
+            _startLocationServiceCheck();
+          }
+        }
+      });
+    }
+  }
+
+  Widget _buildLocationSection() {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: AppColors.primary.withOpacity(0.1),
+              ),
+              child: SvgPicture.asset(
+                "assets/svg/location.svg",
+                width: 15,
+                height: 15,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_locationErrorType != null && !_isLoadingLocation)
+                    Row(
+                      children: [
+
+                        Expanded(
+                          child: Text(
+                            _locationErrorMessage ?? 'Failed to get location',
+                            style: AppTypography.bodySmall.copyWith(
+                              color: Colors.orange,
+                            ),
+                            maxLines: 2,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _handleLocationRetry,
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            minimumSize: Size.zero,
+                          ),
+                          child: Text(
+                            'Retry',
+                            style: AppTypography.bodySmall.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  if (_isLoadingLocation)
+                    Row(
+                      children: [
+                        const SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Getting location...',
+                          style: AppTypography.bodyMedium.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    )
+                  else
+                    Text(
+                      _address,
+                      style: AppTypography.bodyMedium.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+
+      ],
+    );
   }
 
   Widget _buildTimeCard({
@@ -155,34 +332,7 @@ class _AttendanceCardState extends State<AttendanceCard> {
             ],
           ),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  color: AppColors.primary.withOpacity(0.1),
-                ),
-                child: SvgPicture.asset(
-                  "assets/svg/location.svg",
-                  width: 15,
-                  height: 15,
-                  color: AppColors.primary,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  _address,
-                  style: AppTypography.bodyMedium.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
+          _buildLocationSection(),
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,

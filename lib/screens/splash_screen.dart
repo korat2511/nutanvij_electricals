@@ -67,9 +67,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     // Check if user exists and redirect accordingly
     if (userProvider.user != null) {
       log(userProvider.user!.token);
-      NavigationUtils.pushReplacement(context, HomeScreen());
+      NavigationUtils.pushReplacement(context, const HomeScreen());
     } else {
-      NavigationUtils.pushReplacement(context, LoginScreen());
+      NavigationUtils.pushReplacement(context, const LoginScreen());
     }
   }
 

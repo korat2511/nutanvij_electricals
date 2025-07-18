@@ -72,4 +72,73 @@ class ImagePickerUtils {
     final List<XFile> images = await picker.pickMultiImage();
     return images.map((xFile) => xFile.path).toList();
   }
+
+  static Future<List<String>> pickImages({
+    required BuildContext context,
+    bool allowCamera = true,
+    bool allowGallery = true,
+    int imageQuality = 70,
+  }) async {
+    if (!allowCamera && !allowGallery) {
+      throw Exception('At least one source must be allowed');
+    }
+
+    final ImageSource? source = await showDialog<ImageSource>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(
+            'Select Image Source',
+            style: AppTypography.titleLarge.copyWith(
+              color: AppColors.primary,
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (allowCamera)
+                ListTile(
+                  leading: const Icon(Icons.camera_alt, color: AppColors.primary),
+                  title: const Text('Camera'),
+                  onTap: () => Navigator.pop(context, ImageSource.camera),
+                ),
+              if (allowGallery)
+                ListTile(
+                  leading: const Icon(Icons.photo_library, color: AppColors.primary),
+                  title: const Text('Gallery'),
+                  onTap: () => Navigator.pop(context, ImageSource.gallery),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (source == null) return [];
+
+    try {
+      if (source == ImageSource.camera) {
+        final XFile? image = await ImagePicker().pickImage(
+          source: ImageSource.camera,
+          imageQuality: imageQuality,
+        );
+        return image != null ? [image.path] : [];
+      } else {
+        final List<XFile> images = await ImagePicker().pickMultiImage(
+          imageQuality: imageQuality,
+        );
+        return images.map((xFile) => xFile.path).toList();
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to pick image(s):  [${e.toString()}'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+      return [];
+    }
+  }
 } 

@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:intl/intl.dart';
@@ -70,15 +72,26 @@ class _AllUserAttendanceScreenState extends State<AllUserAttendanceScreen> {
       if (admin == null) return;
       final startDate = DateFormat('yyyy-MM-01').format(_selectedMonth);
       final endDate = DateFormat('yyyy-MM-dd').format(DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0));
+      // Fetch all pages for the month
+      List<Map<String, dynamic>> allRecords = [];
+      int page = 1;
+      while (true) {
       final records = await ApiService().getAttendanceList(
         context: context,
         apiToken: admin.data.apiToken,
         startDate: startDate,
         endDate: endDate,
         userId: _selectedUser!['id'].toString(),
-      );
+          page: page,
+        );
+        if (records.isEmpty) break;
+        allRecords.addAll(records);
+        if (records.length < 10) break; // No more pages
+        page++;
+      }
+      log("Attendance List For User \\${_selectedUser!['id']} \\${allRecords.length}");
       final present = <int>{};
-      for (final rec in records) {
+      for (final rec in allRecords) {
         if (rec['in_time'] != null) {
           final date = DateTime.tryParse(rec['date'] ?? '');
           if (date != null && date.month == _selectedMonth.month) {
@@ -88,7 +101,7 @@ class _AllUserAttendanceScreenState extends State<AllUserAttendanceScreen> {
       }
       setState(() {
         _presentDays = present;
-        _attendanceRecords = records;
+        _attendanceRecords = allRecords;
       });
     } catch (e) {
       SnackBarUtils.showError(context, e.toString());
@@ -219,6 +232,11 @@ class _AllUserAttendanceScreenState extends State<AllUserAttendanceScreen> {
     final monthName = DateFormat('MMMM yyyy').format(_selectedMonth);
     final cellSize = Responsive.responsiveValue(context: context, mobile: 32, tablet: 48);
     final cellRadius = Responsive.responsiveValue(context: context, mobile: 8, tablet: 14);
+    final now = DateTime.now();
+    final isCurrentMonth = _selectedMonth.year == now.year && _selectedMonth.month == now.month;
+    final isPastMonth = _selectedMonth.year < now.year ||
+        (_selectedMonth.year == now.year && _selectedMonth.month < now.month);
+    final today = now.day;
     return Stack(
       children: [
         Container(
@@ -286,9 +304,14 @@ class _AllUserAttendanceScreenState extends State<AllUserAttendanceScreen> {
                         if (week == 0 && day < firstWeekday || dayNum < 1 || dayNum > daysInMonth) {
                           return SizedBox(width: cellSize);
                         }
+                        final date = DateTime(_selectedMonth.year, _selectedMonth.month, dayNum);
+                        final isWorkingDay = date.weekday != DateTime.sunday;
+                        final shouldColor = (isCurrentMonth && dayNum <= today) || isPastMonth;
                         Color? bg;
-                        if (_presentDays.contains(dayNum)) {
+                        if (shouldColor && _presentDays.contains(dayNum)) {
                           bg = Colors.green.shade200;
+                        } else if (shouldColor && isWorkingDay && !_presentDays.contains(dayNum)) {
+                          bg = Colors.red.shade200;
                         }
                         return Container(
                           width: cellSize,

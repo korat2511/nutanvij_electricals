@@ -831,6 +831,7 @@ class _EditAttendanceRequestListScreenState
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
+              backgroundColor: Colors.white,
               title: Text('$action Request'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,

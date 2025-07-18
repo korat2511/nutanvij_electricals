@@ -10,6 +10,7 @@ class UserCard extends StatelessWidget {
   final String? department;
   final Widget? actionButton;
   final VoidCallback? onTap;
+  final Widget? punchStatusIcon;
 
   const UserCard({
     Key? key,
@@ -20,6 +21,7 @@ class UserCard extends StatelessWidget {
     this.department,
     this.actionButton,
     this.onTap,
+    this.punchStatusIcon,
   }) : super(key: key);
 
   @override
@@ -51,7 +53,13 @@ class UserCard extends StatelessWidget {
               Text(department!, style: AppTypography.bodySmall.copyWith(color: Colors.grey[700])),
           ],
         ),
-        trailing: actionButton,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (punchStatusIcon != null) punchStatusIcon!,
+            if (actionButton != null) actionButton!,
+          ],
+        ),
       ),
     );
   }

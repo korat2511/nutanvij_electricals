@@ -17,6 +17,12 @@ class Site {
   final Pivot? pivot;
   final List<SiteImage> siteImages;
   final List<UserInSite> users;
+  // Additional fields from API
+  final int? categoryId;
+  final int? minRange;
+  final int? maxRange;
+  final int? createdBy;
+  final dynamic category;
 
   Site({
     required this.id,
@@ -35,6 +41,11 @@ class Site {
     this.pivot,
     required this.siteImages,
     this.users = const [],
+    this.categoryId,
+    this.minRange,
+    this.maxRange,
+    this.createdBy,
+    this.category,
   });
 
   Site copyWith({
@@ -54,6 +65,11 @@ class Site {
     Pivot? pivot,
     List<SiteImage>? siteImages,
     List<UserInSite>? users,
+    int? categoryId,
+    int? minRange,
+    int? maxRange,
+    int? createdBy,
+    dynamic category,
   }) {
     return Site(
       id: id ?? this.id,
@@ -72,6 +88,11 @@ class Site {
       pivot: pivot ?? this.pivot,
       siteImages: siteImages ?? this.siteImages,
       users: users ?? this.users,
+      categoryId: categoryId ?? this.categoryId,
+      minRange: minRange ?? this.minRange,
+      maxRange: maxRange ?? this.maxRange,
+      createdBy: createdBy ?? this.createdBy,
+      category: category ?? this.category,
     );
   }
 
@@ -93,6 +114,11 @@ class Site {
       pivot: json['pivot'] != null ? Pivot.fromJson(json['pivot']) : null,
       siteImages: (json['site_images'] as List<dynamic>?)?.map((img) => SiteImage.fromJson(img)).toList() ?? [],
       users: (json['users'] as List<dynamic>?)?.map((u) => UserInSite.fromJson(u)).toList() ?? [],
+      categoryId: json['category_id'],
+      minRange: json['min_range'],
+      maxRange: json['max_range'],
+      createdBy: json['created_by'],
+      category: json['category'],
     );
   }
 }
@@ -114,13 +140,31 @@ class Pivot {
 class SiteImage {
   final int id;
   final String imageUrl;
+  final int siteId;
+  final String? createdAt;
+  final String? updatedAt;
+  final String? deletedAt;
+  final String? image; // Original image field from API
 
-  SiteImage({required this.id, required this.imageUrl});
+  SiteImage({
+    required this.id,
+    required this.imageUrl,
+    required this.siteId,
+    this.createdAt,
+    this.updatedAt,
+    this.deletedAt,
+    this.image,
+  });
 
   factory SiteImage.fromJson(Map<String, dynamic> json) {
     return SiteImage(
       id: json['id'],
-      imageUrl: json['image_url'],
+      imageUrl: json['image_url'] ?? '',
+      siteId: json['site_id'] ?? 0,
+      createdAt: json['created_at'],
+      updatedAt: json['updated_at'],
+      deletedAt: json['deleted_at'],
+      image: json['image'],
     );
   }
 }
@@ -130,8 +174,35 @@ class UserInSite {
   final String name;
   final String? imagePath;
   final Pivot? pivot;
+  final int hasKeypadMobile;
+  final String? lastStatus;
 
-  UserInSite({required this.id, required this.name, this.imagePath, this.pivot});
+  UserInSite({
+    required this.id,
+    required this.name,
+    this.imagePath,
+    this.pivot,
+    this.hasKeypadMobile = 0,
+    this.lastStatus,
+  });
+
+  UserInSite copyWith({
+    int? id,
+    String? name,
+    String? imagePath,
+    Pivot? pivot,
+    int? hasKeypadMobile,
+    String? lastStatus,
+  }) {
+    return UserInSite(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      imagePath: imagePath ?? this.imagePath,
+      pivot: pivot ?? this.pivot,
+      hasKeypadMobile: hasKeypadMobile ?? this.hasKeypadMobile,
+      lastStatus: lastStatus ?? this.lastStatus,
+    );
+  }
 
   factory UserInSite.fromJson(Map<String, dynamic> json) {
     return UserInSite(
@@ -139,6 +210,8 @@ class UserInSite {
       name: json['name'] ?? '',
       imagePath: json['image_path'],
       pivot: json['pivot'] != null ? Pivot.fromJson(json['pivot']) : null,
+      hasKeypadMobile: json['has_keypad_mobile'] ?? 0,
+      lastStatus: json['last_status'],
     );
   }
 } 

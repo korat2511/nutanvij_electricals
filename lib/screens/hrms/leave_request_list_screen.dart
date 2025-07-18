@@ -182,6 +182,7 @@ class _LeaveRequestListScreenState extends State<LeaveRequestListScreen> {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
+              backgroundColor: Colors.white,
               title: Text('$action Leave'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,

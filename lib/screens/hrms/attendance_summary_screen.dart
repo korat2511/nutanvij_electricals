@@ -58,14 +58,25 @@ class _AttendanceSummaryScreenState extends State<AttendanceSummaryScreen>
       final startDate = DateFormat('yyyy-MM-01').format(_selectedMonth);
       final endDate = DateFormat('yyyy-MM-dd')
           .format(DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0));
+      // Fetch all pages for the month
+      List<Map<String, dynamic>> allRecords = [];
+      int page = 1;
+      while (true) {
       final records = await ApiService().getAttendanceList(
           context: context,
           apiToken: user.data.apiToken,
           startDate: startDate,
           endDate: endDate,
-          userId: user.data.id.toString());
+          userId: user.data.id.toString(),
+          page: page,
+        );
+        if (records.isEmpty) break;
+        allRecords.addAll(records);
+        if (records.length < 10) break;
+        page++;
+      }
       final present = <int>{};
-      for (final rec in records) {
+      for (final rec in allRecords) {
         if (rec['in_time'] != null) {
           final date = DateTime.tryParse(rec['date'] ?? '');
           if (date != null && date.month == _selectedMonth.month) {
@@ -75,7 +86,7 @@ class _AttendanceSummaryScreenState extends State<AttendanceSummaryScreen>
       }
       setState(() {
         _presentDays = present;
-        _attendanceRecords = records;
+        _attendanceRecords = allRecords;
       });
     } catch (e) {
       // Optionally show error
@@ -142,7 +153,7 @@ class _AttendanceSummaryScreenState extends State<AttendanceSummaryScreen>
                             context: context,
                             initialDate: DateTime.now().subtract(const Duration(days: 1)),
                             firstDate: DateTime(2000),
-                            lastDate: DateTime.now().subtract(const Duration(days: 1)),
+                            lastDate: DateTime.now(),
                           );
                           if (picked != null) {
                             setState(() {
@@ -609,14 +620,10 @@ class _AttendanceSummaryScreenState extends State<AttendanceSummaryScreen>
                         final date = DateTime(_selectedMonth.year, _selectedMonth.month, dayNum);
                         final isWorkingDay = date.weekday != DateTime.sunday;
                         final shouldColor = (isCurrentMonth && dayNum <= today) || isPastMonth;
-                        final isPresent = _presentDays.contains(dayNum);
-                        final isAbsent = shouldColor && isWorkingDay && !isPresent;
-                        // Debug prints
-
                         Color? bg;
-                        if (shouldColor && isPresent) {
+                        if (shouldColor && _presentDays.contains(dayNum)) {
                           bg = Colors.green.shade200;
-                        } else if (isAbsent) {
+                        } else if (shouldColor && isWorkingDay && !_presentDays.contains(dayNum)) {
                           bg = Colors.red.shade200;
                         }
                         return Container(

@@ -15,6 +15,12 @@ class SiteValidationUtils {
     return userProvider.user?.data.designationId == 1;
   }
 
+  static bool canEditSite(BuildContext context) {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final currentDesignationId = userProvider.user?.data.designationId ?? 99;
+    return [1, 2, 3, 4].contains(currentDesignationId);
+  }
+
   static bool canRemoveUser(BuildContext context, int userId) {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     return userProvider.user?.data.id != userId;
@@ -34,7 +40,14 @@ class SiteValidationUtils {
     );
   }
 
-  static bool validateUserManagement(BuildContext context, {int? userIdToRemove}) {
+  static bool validateUserManagement(
+    BuildContext context, {
+    int? userIdToRemove,
+    int? targetUserDesignationId,
+  }) {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final currentDesignationId = userProvider.user?.data.designationId ?? 99;
+
     if (!canManageUsers(context)) {
       showNoPermissionError(context);
       return false;
@@ -42,6 +55,14 @@ class SiteValidationUtils {
 
     if (userIdToRemove != null && !canRemoveUser(context, userIdToRemove)) {
       showCannotRemoveSelfError(context);
+      return false;
+    }
+
+    if (targetUserDesignationId != null && targetUserDesignationId < currentDesignationId) {
+      SnackBarUtils.showError(
+        context,
+        "You cannot manage a user with higher authority than yourself.",
+      );
       return false;
     }
 

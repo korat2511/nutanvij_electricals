@@ -71,8 +71,10 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
             return;
           }
           if (_duration == 'Late Coming' || _duration == 'Early Off' || _duration == 'Half Day') {
-            SnackBarUtils.showError(context, 'Start and end date must be same for ${_duration}');
-            return;
+            if (!picked.isAtSameMomentAs(_startDate!)) {
+              SnackBarUtils.showError(context, 'Start and end date must be same for  $_duration');
+              return;
+            }
           }
           _endDate = picked;
         }

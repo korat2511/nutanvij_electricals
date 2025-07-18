@@ -13,39 +13,90 @@ import '../../providers/user_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geocoding/geocoding.dart' as geocoding;
+import '../../models/site.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/foundation.dart';
-import '../../core/utils/image_compression_utils.dart';
 
-class CreateSiteScreen extends StatefulWidget {
+class EditSiteScreen extends StatefulWidget {
+  final Site site;
+  
+  const EditSiteScreen({Key? key, required this.site}) : super(key: key);
+
   @override
-  _CreateSiteScreenState createState() => _CreateSiteScreenState();
+  _EditSiteScreenState createState() => _EditSiteScreenState();
 }
 
-class _CreateSiteScreenState extends State<CreateSiteScreen> {
+class _EditSiteScreenState extends State<EditSiteScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _latitudeController = TextEditingController();
   final TextEditingController _longitudeController = TextEditingController();
-  final TextEditingController _companyController = TextEditingController(text: 'NEPL');
+  final TextEditingController _companyController = TextEditingController();
   final TextEditingController _addressController = TextEditingController();
-  final TextEditingController _minRangeController = TextEditingController(text: '500');
-  final TextEditingController _maxRangeController = TextEditingController(text: '500');
-  final List<String> _images = [];
+  final TextEditingController _minRangeController = TextEditingController();
+  final TextEditingController _maxRangeController = TextEditingController();
+  
+  final List<String> _newImages = [];
+  List<SiteImage> _existingImages = [];
+  List<int> _existingImageIds = [];
+  
   bool _isLoading = false;
   DateTime? _startDate;
   DateTime? _endDate;
   GoogleMapController? _mapController;
   LatLng? _selectedLatLng;
   bool _isMapLoading = true;
+  bool _isDeletingImage = false;
+  int? _deletingImageId;
   final Key _mapKey = UniqueKey();
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeData();
+  }
+
+  void _initializeData() {
+    final site = widget.site;
+    _nameController.text = site.name;
+    _companyController.text = site.company;
+    _addressController.text = site.address;
+    _latitudeController.text = site.latitude;
+    _longitudeController.text = site.longitude;
+    _minRangeController.text = site.minRange?.toString() ?? '500';
+    _maxRangeController.text = site.maxRange?.toString() ?? '500';
+    
+    if (site.startDate != null) {
+      _startDate = DateFormat('yyyy-MM-dd').parse(site.startDate!);
+    }
+    if (site.endDate != null) {
+      _endDate = DateFormat('yyyy-MM-dd').parse(site.endDate!);
+    }
+    
+    _selectedLatLng = LatLng(double.parse(site.latitude), double.parse(site.longitude));
+    _existingImages = List.from(site.siteImages);
+    _existingImageIds = site.siteImages.map((img) => img.id).toList();
+  }
+
+  @override
+  void dispose() {
+    _mapController?.dispose();
+    _nameController.dispose();
+    _latitudeController.dispose();
+    _longitudeController.dispose();
+    _companyController.dispose();
+    _addressController.dispose();
+    _minRangeController.dispose();
+    _maxRangeController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text('Create Site', style: AppTypography.titleLarge),
+        title: Text('Edit Site', style: AppTypography.titleLarge),
         backgroundColor: AppColors.primary,
       ),
       body: GestureDetector(
@@ -54,7 +105,7 @@ class _CreateSiteScreenState extends State<CreateSiteScreen> {
           FocusScope.of(context).unfocus();
         },
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10),
+          padding: const EdgeInsets.all(16.0),
           child: Form(
             key: _formKey,
             child: ListView(
@@ -100,7 +151,6 @@ class _CreateSiteScreenState extends State<CreateSiteScreen> {
                 CustomTextField(
                   controller: _companyController,
                   label: 'Company',
-                  readOnly: true,
                   validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                 ),
                 const SizedBox(height: 16),
@@ -217,7 +267,6 @@ class _CreateSiteScreenState extends State<CreateSiteScreen> {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -250,20 +299,79 @@ class _CreateSiteScreenState extends State<CreateSiteScreen> {
                     ),
                   ],
                 ),
-
-
-
-
-
-
                 const SizedBox(height: 16),
-                Text('Images (pick at least one):', style: AppTypography.bodyMedium),
+                Text('Existing Images:', style: AppTypography.bodyMedium),
+                const SizedBox(height: 8),
+                if (_existingImages.isNotEmpty)
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _existingImages.map((img) => Stack(
+                      alignment: Alignment.topRight,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            img.imageUrl,
+                            width: 70,
+                            height: 70,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () async {
+                            if (_isDeletingImage) return;
+                            setState(() {
+                              _isDeletingImage = true;
+                              _deletingImageId = img.id;
+                            });
+                            final userProvider = Provider.of<UserProvider>(context, listen: false);
+                            try {
+                              await ApiService().deleteSiteImage(
+                                context: context,
+                                apiToken: userProvider.user?.data.apiToken ?? '',
+                                imageId: img.id,
+                              );
+                              setState(() {
+                                _existingImages.remove(img);
+                                _existingImageIds.remove(img.id);
+                              });
+                            } on ApiException catch (e) {
+                              SnackBarUtils.showError(context, e.message);
+                            } catch (e) {
+                              SnackBarUtils.showError(context, 'Failed to delete image.');
+                            } finally {
+                              setState(() {
+                                _isDeletingImage = false;
+                                _deletingImageId = null;
+                              });
+                            }
+                          },
+                          child: _isDeletingImage && _deletingImageId == img.id
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : Container(
+                                  decoration: const BoxDecoration(
+                                    color: Colors.black54,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.close, color: Colors.white, size: 18),
+                                ),
+                        ),
+                      ],
+                    )).toList(),
+                  ),
+                const SizedBox(height: 16),
+                Text('Add New Images:', style: AppTypography.bodyMedium),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    ..._images.map((img) => Stack(
+                    ..._newImages.map((img) => Stack(
                           alignment: Alignment.topRight,
                           children: [
                             ClipRRect(
@@ -278,7 +386,7 @@ class _CreateSiteScreenState extends State<CreateSiteScreen> {
                             GestureDetector(
                               onTap: () {
                                 setState(() {
-                                  _images.remove(img);
+                                  _newImages.remove(img);
                                 });
                               },
                               child: Container(
@@ -295,29 +403,9 @@ class _CreateSiteScreenState extends State<CreateSiteScreen> {
                       onTap: () async {
                         final picked = await ImagePickerUtils.pickMultipleImages(context: context);
                         if (picked.isNotEmpty) {
-                          // Show loading indicator
-                          showDialog(
-                            context: context,
-                            barrierDismissible: false,
-                            builder: (context) => const Center(
-                              child: CircularProgressIndicator(),
-                            ),
-                          );
-
-                          try {
-                            // Compress images
-                            final imageFiles = picked.map((p) => File(p)).toList();
-                            final compressedImages = await ImageCompressionUtils.compressImages(imageFiles);
-                            
-                            setState(() {
-                              _images.addAll(compressedImages.map((f) => f.path).where((p) => !_images.contains(p)));
-                            });
-                          } finally {
-                            // Hide loading indicator
-                            if (mounted) {
-                              Navigator.of(context).pop();
-                            }
-                          }
+                          setState(() {
+                            _newImages.addAll(picked.where((p) => !_newImages.contains(p)));
+                          });
                         }
                       },
                       child: Container(
@@ -333,17 +421,17 @@ class _CreateSiteScreenState extends State<CreateSiteScreen> {
                     ),
                   ],
                 ),
-                if (_images.isEmpty)
+                if (_existingImages.isEmpty && _newImages.isEmpty)
                   const Padding(
                     padding: EdgeInsets.only(top: 8.0),
-                    child: Text('Please pick at least one image.', style: TextStyle(color: AppColors.error)),
+                    child: Text('Please keep at least one image.', style: TextStyle(color: AppColors.error)),
                   ),
                 const SizedBox(height: 24),
                 CustomButton(
-                  text: 'Create Site',
+                  text: 'Update Site',
                   isLoading: _isLoading,
                   onPressed: () async {
-                    if (_formKey.currentState!.validate() && _images.isNotEmpty) {
+                    if (_formKey.currentState!.validate() && (_existingImages.isNotEmpty || _newImages.isNotEmpty)) {
                       if (_startDate != null && _endDate != null && _endDate!.isBefore(_startDate!)) {
                         SnackBarUtils.showError(context, 'End date cannot be before start date.');
                         return;
@@ -351,9 +439,10 @@ class _CreateSiteScreenState extends State<CreateSiteScreen> {
                       setState(() => _isLoading = true);
                       final userProvider = Provider.of<UserProvider>(context, listen: false);
                       try {
-                        await ApiService().createSite(
+                        await ApiService().updateSite(
                           context: context,
                           apiToken: userProvider.user?.data.apiToken ?? '',
+                          siteId: widget.site.id,
                           name: _nameController.text.trim(),
                           latitude: _latitudeController.text.trim(),
                           longitude: _longitudeController.text.trim(),
@@ -363,10 +452,11 @@ class _CreateSiteScreenState extends State<CreateSiteScreen> {
                           endDate: _endDate != null ? DateFormat('yyyy-MM-dd').format(_endDate!) : '',
                           minRange: int.parse(_minRangeController.text.trim()),
                           maxRange: int.parse(_maxRangeController.text.trim()),
-                          imagePaths: _images,
+                          newImagePaths: _newImages,
+                          existingImageIds: _existingImageIds,
                         );
                         if (mounted) {
-                          SnackBarUtils.showSuccess(context, 'Site created successfully!');
+                          SnackBarUtils.showSuccess(context, 'Site updated successfully!');
                           NavigationUtils.pop(context, true);
                         }
                       } on ApiException catch (e) {
@@ -412,18 +502,5 @@ class _CreateSiteScreenState extends State<CreateSiteScreen> {
     } catch (e) {
       // ignore geocoding errors
     }
-  }
-
-  @override
-  void dispose() {
-    _mapController?.dispose();
-    _nameController.dispose();
-    _latitudeController.dispose();
-    _longitudeController.dispose();
-    _companyController.dispose();
-    _addressController.dispose();
-    _minRangeController.dispose();
-    _maxRangeController.dispose();
-    super.dispose();
   }
 } 
