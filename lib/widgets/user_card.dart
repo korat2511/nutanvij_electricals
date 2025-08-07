@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_typography.dart';
+import 'clickable_user_name.dart';
+import '../models/task.dart';
 
 class UserCard extends StatelessWidget {
   final String name;
@@ -11,6 +13,7 @@ class UserCard extends StatelessWidget {
   final Widget? actionButton;
   final VoidCallback? onTap;
   final Widget? punchStatusIcon;
+  final AssignUser? user; // Add user object for clickable functionality
 
   const UserCard({
     Key? key,
@@ -22,6 +25,7 @@ class UserCard extends StatelessWidget {
     this.actionButton,
     this.onTap,
     this.punchStatusIcon,
+    this.user,
   }) : super(key: key);
 
   @override
@@ -42,7 +46,12 @@ class UserCard extends StatelessWidget {
                 )
               : null,
         ),
-        title: Text(name, style: AppTypography.bodyMedium),
+        title: user != null 
+            ? ClickableUserName(
+                user: user!,
+                style: AppTypography.bodyMedium,
+              )
+            : Text(name, style: AppTypography.bodyMedium),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

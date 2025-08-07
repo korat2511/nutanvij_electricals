@@ -121,6 +121,32 @@ class Site {
       category: json['category'],
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'latitude': latitude,
+      'longitude': longitude,
+      'address': address,
+      'company': company,
+      'start_date': startDate,
+      'end_date': endDate,
+      'status': status,
+      'created_at': createdAt,
+      'updated_at': updatedAt,
+      'deleted_at': deletedAt,
+      'pinned': pinned,
+      'pivot': pivot?.toJson(),
+      'site_images': siteImages.map((img) => img.toJson()).toList(),
+      'users': users.map((user) => user.toJson()).toList(),
+      'category_id': categoryId,
+      'min_range': minRange,
+      'max_range': maxRange,
+      'created_by': createdBy,
+      'category': category,
+    };
+  }
 }
 
 class Pivot {
@@ -134,6 +160,13 @@ class Pivot {
       userId: json['user_id'],
       siteId: json['site_id'],
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'user_id': userId,
+      'site_id': siteId,
+    };
   }
 }
 
@@ -166,6 +199,18 @@ class SiteImage {
       deletedAt: json['deleted_at'],
       image: json['image'],
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'image_url': imageUrl,
+      'site_id': siteId,
+      'created_at': createdAt,
+      'updated_at': updatedAt,
+      'deleted_at': deletedAt,
+      'image': image,
+    };
   }
 }
 
@@ -213,5 +258,16 @@ class UserInSite {
       hasKeypadMobile: json['has_keypad_mobile'] ?? 0,
       lastStatus: json['last_status'],
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'image_path': imagePath,
+      'pivot': pivot?.toJson(),
+      'has_keypad_mobile': hasKeypadMobile,
+      'last_status': lastStatus,
+    };
   }
 } 

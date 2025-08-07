@@ -3,6 +3,7 @@ import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:nutanvij_electricals/screens/hrms/apply_expense_screen.dart';
+import 'package:nutanvij_electricals/screens/hrms/payment_data_screen.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -14,6 +15,8 @@ import '../../providers/user_provider.dart';
 import '../../services/api_service.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/clickable_user_name.dart';
+import '../../models/task.dart';
 
 class ExpenseRequestListScreen extends StatefulWidget {
   final bool isAllUsers;
@@ -155,17 +158,17 @@ class _ExpenseRequestListScreenState extends State<ExpenseRequestListScreen> {
     });
   }
 
-  Future<void> _handleExpenseAction(String expenseId, String status, double requestedAmount) async {
-    Map<String, dynamic>? result = await _showApprovalDialog(context, status, requestedAmount);
+  Future<void> _handleExpenseAction(
+      String expenseId, String status, double requestedAmount) async {
+    Map<String, dynamic>? result =
+        await _showApprovalDialog(context, status, requestedAmount);
     if (result == null) return;
-
 
     log("RESULT == $result");
 
-
     final reason = result['reason'] as String;
     final approvedAmount = result['approvedAmount'] as int;
-    
+
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     final user = userProvider.user;
     if (user == null) return;
@@ -184,7 +187,6 @@ class _ExpenseRequestListScreenState extends State<ExpenseRequestListScreen> {
         reason: reason,
       );
 
-
       log("Data == $data");
 
       Navigator.of(context).pop();
@@ -198,39 +200,40 @@ class _ExpenseRequestListScreenState extends State<ExpenseRequestListScreen> {
 
   Future<bool> _showCancelConfirmationDialog(BuildContext context) async {
     return await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) {
-        return AlertDialog(
-          backgroundColor: Colors.white,
-          title: const Text('Cancel Expense Request'),
-          content: const Text(
-            'Are you sure you want to cancel this expense request? This action cannot be undone.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('No, Keep It'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) {
+            return AlertDialog(
+              backgroundColor: Colors.white,
+              title: const Text('Cancel Expense Request'),
+              content: const Text(
+                'Are you sure you want to cancel this expense request? This action cannot be undone.',
               ),
-              child: const Text('Yes, Cancel'),
-            ),
-          ],
-        );
-      },
-    ) ?? false;
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  child: const Text('No, Keep It'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(ctx).pop(true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Yes, Cancel'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
   }
 
   Future<void> _cancelRequest(String expenseId) async {
     // Show confirmation dialog first
     final shouldCancel = await _showCancelConfirmationDialog(context);
     if (!shouldCancel) return;
-    
+
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     final user = userProvider.user;
     if (user == null) return;
@@ -254,12 +257,13 @@ class _ExpenseRequestListScreenState extends State<ExpenseRequestListScreen> {
     }
   }
 
-  Future<Map<String, dynamic>?> _showApprovalDialog(BuildContext context, String action, double requestedAmount) async {
+  Future<Map<String, dynamic>?> _showApprovalDialog(
+      BuildContext context, String action, double requestedAmount) async {
     final TextEditingController reasonController = TextEditingController();
     final TextEditingController amountController = TextEditingController();
     String? reasonErrorText;
     String? amountErrorText;
-    
+
     return await showDialog<Map<String, dynamic>>(
       context: context,
       barrierDismissible: false,
@@ -273,7 +277,8 @@ class _ExpenseRequestListScreenState extends State<ExpenseRequestListScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (action.toLowerCase() == 'approved') ...[
-                    Text('Requested Amount: ₹${requestedAmount.toStringAsFixed(2)}'),
+                    Text(
+                        'Requested Amount: ₹${requestedAmount.toStringAsFixed(2)}'),
                     const SizedBox(height: 12),
                     TextField(
                       controller: amountController,
@@ -318,39 +323,44 @@ class _ExpenseRequestListScreenState extends State<ExpenseRequestListScreen> {
                 ElevatedButton(
                   onPressed: () {
                     bool isValid = true;
-                    
+
                     // Validate reason
                     if (reasonController.text.trim().isEmpty) {
                       setState(() => reasonErrorText = 'Reason is required');
                       isValid = false;
                     }
-                    
+
                     // Validate approved amount for approval action
                     if (action.toLowerCase() == 'approved') {
                       if (amountController.text.trim().isEmpty) {
-                        setState(() => amountErrorText = 'Approved amount is required');
+                        setState(() =>
+                            amountErrorText = 'Approved amount is required');
                         isValid = false;
                       } else {
                         try {
-                          final approvedAmount = double.parse(amountController.text.trim());
+                          final approvedAmount =
+                              double.parse(amountController.text.trim());
                           if (approvedAmount <= 0) {
-                            setState(() => amountErrorText = 'Approved amount must be greater than 0. Use reject if you want to reject the expense.');
+                            setState(() => amountErrorText =
+                                'Approved amount must be greater than 0. Use reject if you want to reject the expense.');
                             isValid = false;
                           } else if (approvedAmount > requestedAmount) {
-                            setState(() => amountErrorText = 'Approved amount cannot be greater than requested amount (₹${requestedAmount.toStringAsFixed(2)})');
+                            setState(() => amountErrorText =
+                                'Approved amount cannot be greater than requested amount (₹${requestedAmount.toStringAsFixed(2)})');
                             isValid = false;
                           }
                         } catch (e) {
-                          setState(() => amountErrorText = 'Please enter a valid amount');
+                          setState(() =>
+                              amountErrorText = 'Please enter a valid amount');
                           isValid = false;
                         }
                       }
                     }
-                    
+
                     if (isValid) {
                       final result = {
                         'reason': reasonController.text.trim(),
-                        'approvedAmount': action.toLowerCase() == 'approved' 
+                        'approvedAmount': action.toLowerCase() == 'approved'
                             ? int.parse(amountController.text.trim())
                             : 0,
                       };
@@ -551,7 +561,11 @@ class _ExpenseRequestListScreenState extends State<ExpenseRequestListScreen> {
                                   final showActions =
                                       canShowAction && widget.isAllUsers;
                                   return Container(
-                                    margin: EdgeInsets.only(bottom: (i == _filteredRequests.length - 1) ? 240 : 0),
+                                    margin: EdgeInsets.only(
+                                        bottom:
+                                            (i == _filteredRequests.length - 1)
+                                                ? 240
+                                                : 0),
                                     padding: const EdgeInsets.all(16.0),
                                     decoration: BoxDecoration(
                                       color: Colors.white,
@@ -578,11 +592,14 @@ class _ExpenseRequestListScreenState extends State<ExpenseRequestListScreen> {
                                               width: 230,
                                               child: Text(
                                                   widget.isAllUsers
-                                                      ? (userInfo['name'] ?? '-')
+                                                      ? (userInfo['name'] ??
+                                                          '-')
                                                       : (req['title'] ?? '-'),
                                                   maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                  style: AppTypography.titleMedium
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: AppTypography
+                                                      .titleMedium
                                                       .copyWith(
                                                           fontWeight:
                                                               FontWeight.bold)),
@@ -618,11 +635,11 @@ class _ExpenseRequestListScreenState extends State<ExpenseRequestListScreen> {
                                               'Title', req['title'] ?? '-'),
                                         _infoRow(
                                             'Amount', req['amount'] ?? '-'),
-                                        if (isApproved && req['approved_amount'] != null)
-                                          _infoRow(
-                                            'Approved Amount', 
-                                            req['approved_amount'].toString(),
-                                            valueColor: Colors.green),
+                                        if (isApproved &&
+                                            req['approved_amount'] != null)
+                                          _infoRow('Approved Amount',
+                                              req['approved_amount'].toString(),
+                                              valueColor: Colors.green),
                                         _infoRow('Description', reason),
                                         _infoRow(
                                             'Expense Date', expenseDateLabel),
@@ -705,7 +722,12 @@ class _ExpenseRequestListScreenState extends State<ExpenseRequestListScreen> {
                                                     size: 32),
                                                 onPressed: () async {
                                                   if (reason.isNotEmpty) {
-                                                    final requestedAmount = double.tryParse((req['amount'] ?? '0').toString()) ?? 0.0;
+                                                    final requestedAmount =
+                                                        double.tryParse(
+                                                                (req['amount'] ??
+                                                                        '0')
+                                                                    .toString()) ??
+                                                            0.0;
                                                     await _handleExpenseAction(
                                                         req['id'].toString(),
                                                         'Rejected',
@@ -722,7 +744,12 @@ class _ExpenseRequestListScreenState extends State<ExpenseRequestListScreen> {
                                                     size: 32),
                                                 onPressed: () async {
                                                   if (reason.isNotEmpty) {
-                                                    final requestedAmount = double.tryParse((req['amount'] ?? '0').toString()) ?? 0.0;
+                                                    final requestedAmount =
+                                                        double.tryParse(
+                                                                (req['amount'] ??
+                                                                        '0')
+                                                                    .toString()) ??
+                                                            0.0;
                                                     await _handleExpenseAction(
                                                         req['id'].toString(),
                                                         'Approved',
@@ -773,7 +800,8 @@ class _ExpenseRequestListScreenState extends State<ExpenseRequestListScreen> {
                         CustomButton(
                             text: "View Payments",
                             onPressed: () {
-                              SnackBarUtils.showSuccess(context, "Coming soon...");
+                              NavigationUtils.push(
+                                  context, const PaymentDataScreen());
                             }),
                         SizedBox(
                           height: Responsive.spacingM,
@@ -1150,7 +1178,7 @@ class _UserSearchDelegate extends SearchDelegate<Map<String, dynamic>?> {
       itemBuilder: (context, index) {
         final user = results[index];
         return ListTile(
-          title: Text(user['name'] ?? ''),
+          title: Text(user['name']),
           onTap: () => close(context, user),
         );
       },
@@ -1168,7 +1196,7 @@ class _UserSearchDelegate extends SearchDelegate<Map<String, dynamic>?> {
       itemBuilder: (context, index) {
         final user = suggestions[index];
         return ListTile(
-          title: Text(user['name'] ?? ''),
+          title: Text(user['name']),
           onTap: () => close(context, user),
         );
       },

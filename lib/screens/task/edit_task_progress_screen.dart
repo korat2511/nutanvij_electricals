@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/utils/snackbar_utils.dart';
-import '../../core/utils/task_validation_utils.dart';
 import '../../core/utils/image_compression_utils.dart';
 import '../../core/utils/image_picker_utils.dart';
 import '../../providers/user_provider.dart';
@@ -16,16 +15,16 @@ import '../../models/task.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
 
-class UpdateTaskProgressScreen extends StatefulWidget {
-  final Task task;
+class EditTaskProgressScreen extends StatefulWidget {
+  final TaskProgress progress;
 
-  const UpdateTaskProgressScreen({Key? key, required this.task}) : super(key: key);
+  const EditTaskProgressScreen({Key? key, required this.progress}) : super(key: key);
 
   @override
-  State<UpdateTaskProgressScreen> createState() => _UpdateTaskProgressScreenState();
+  State<EditTaskProgressScreen> createState() => _EditTaskProgressScreenState();
 }
 
-class _UpdateTaskProgressScreenState extends State<UpdateTaskProgressScreen> {
+class _EditTaskProgressScreenState extends State<EditTaskProgressScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _workDoneController = TextEditingController();
   final TextEditingController _remarkController = TextEditingController();
@@ -35,9 +34,6 @@ class _UpdateTaskProgressScreenState extends State<UpdateTaskProgressScreen> {
   
   bool _isLoading = false;
   final String _selectedUnit = '%';
-  double _currentProgress = 0.0;
-  double _totalWorkDone = 0.0;
-  double _totalWork = 100.0;
 
   @override
   void initState() {
@@ -46,10 +42,8 @@ class _UpdateTaskProgressScreenState extends State<UpdateTaskProgressScreen> {
   }
 
   void _initializeProgress() {
-    // Get current progress from task
-    _currentProgress = widget.task.progress?.toDouble() ?? 0.0;
-    _totalWorkDone = widget.task.totalWorkDone?.toDouble() ?? 0.0;
-    _totalWork = widget.task.totalWork?.toDouble() ?? 100.0;
+    _workDoneController.text = widget.progress.workDone;
+    _remarkController.text = widget.progress.remark;
   }
 
   @override
@@ -114,12 +108,10 @@ class _UpdateTaskProgressScreenState extends State<UpdateTaskProgressScreen> {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       final apiToken = userProvider.user?.data.apiToken ?? '';
       
-      await ApiService().updateTaskProgress(
+      await ApiService().editTaskProgress(
         apiToken: apiToken,
-        taskId: widget.task.id,
+        progressId: widget.progress.id,
         workDone: _workDoneController.text.trim(),
-        workLeft: '0', // Set workLeft to 0 since we're not using it anymore
-        unit: _selectedUnit,
         remark: _remarkController.text.trim().isEmpty ? null : _remarkController.text.trim(),
         images: _progressImages.isEmpty ? null : _progressImages,
         attachments: _progressAttachments.isEmpty ? null : _progressAttachments,
@@ -139,7 +131,7 @@ class _UpdateTaskProgressScreenState extends State<UpdateTaskProgressScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
       appBar: CustomAppBar(
-        title: 'Update Progress',
+        title: 'Edit Progress',
         onMenuPressed: () => Navigator.of(context).pop(),
         showProfilePicture: false,
         showNotification: false,
@@ -156,7 +148,7 @@ class _UpdateTaskProgressScreenState extends State<UpdateTaskProgressScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Task Info Card
+              // Progress Info Card
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
@@ -175,26 +167,39 @@ class _UpdateTaskProgressScreenState extends State<UpdateTaskProgressScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      widget.task.name,
+                      'Current Progress Details',
                       style: AppTypography.titleMedium.copyWith(
                         fontWeight: FontWeight.w600,
                         color: Colors.black87,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     Row(
                       children: [
                         Expanded(
-                          child: _buildProgressInfo('Current Progress', '${_currentProgress.toStringAsFixed(1)}%'),
+                          child: _buildProgressInfo('Work Done', '${widget.progress.workDone} ${widget.progress.unit ?? '%'}'),
                         ),
                         Expanded(
-                          child: _buildProgressInfo('Total Work Done', '${_totalWorkDone.toStringAsFixed(1)} $_selectedUnit'),
+                          child: _buildProgressInfo('Status', widget.progress.status),
                         ),
                         Expanded(
-                          child: _buildProgressInfo('Total Work', '${_totalWork.toStringAsFixed(1)} $_selectedUnit'),
+                          child: _buildProgressInfo('Created', _formatDate(widget.progress.createdAt)),
                         ),
                       ],
                     ),
+                    if (widget.progress.approvedAt != null) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildProgressInfo('Approved By', widget.progress.approvedBy?.name ?? 'N/A'),
+                          ),
+                          Expanded(
+                            child: _buildProgressInfo('Approved At', _formatDate(widget.progress.approvedAt!)),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -220,7 +225,7 @@ class _UpdateTaskProgressScreenState extends State<UpdateTaskProgressScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Progress Update',
+                      'Edit Progress',
                       style: AppTypography.titleMedium.copyWith(
                         fontWeight: FontWeight.w600,
                         color: Colors.black87,
@@ -228,22 +233,22 @@ class _UpdateTaskProgressScreenState extends State<UpdateTaskProgressScreen> {
                     ),
                     const SizedBox(height: 16),
                     
-                                         // Work Done
-                     CustomTextField(
-                       controller: _workDoneController,
-                       label: 'Work Done Today',
-                       keyboardType: TextInputType.number,
-                       validator: (value) {
-                         if (value == null || value.isEmpty) {
-                           return 'Required';
-                         }
-                         final workDone = double.tryParse(value);
-                         if (workDone == null || workDone <= 0) {
-                           return 'Must be a positive number';
-                         }
-                         return null;
-                       },
-                     ),
+                    // Work Done
+                    CustomTextField(
+                      controller: _workDoneController,
+                      label: 'Work Done',
+                      keyboardType: TextInputType.number,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Required';
+                        }
+                        final workDone = double.tryParse(value);
+                        if (workDone == null || workDone <= 0) {
+                          return 'Must be a positive number';
+                        }
+                        return null;
+                      },
+                    ),
                     
                     const SizedBox(height: 12),
                     
@@ -278,7 +283,7 @@ class _UpdateTaskProgressScreenState extends State<UpdateTaskProgressScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Progress Images (Optional)',
+                      'Add New Images (Optional)',
                       style: AppTypography.titleMedium.copyWith(
                         fontWeight: FontWeight.w600,
                         color: Colors.black87,
@@ -379,7 +384,7 @@ class _UpdateTaskProgressScreenState extends State<UpdateTaskProgressScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Attachments (Optional)',
+                      'Add New Attachments (Optional)',
                       style: AppTypography.titleMedium.copyWith(
                         fontWeight: FontWeight.w600,
                         color: Colors.black87,
@@ -484,6 +489,15 @@ class _UpdateTaskProgressScreenState extends State<UpdateTaskProgressScreen> {
         ),
       ],
     );
+  }
+
+  String _formatDate(String dateString) {
+    try {
+      final date = DateTime.parse(dateString);
+      return '${date.day}/${date.month}/${date.year}';
+    } catch (e) {
+      return dateString;
+    }
   }
 
   IconData _getFileIcon(String filePath) {

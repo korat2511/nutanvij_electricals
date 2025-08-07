@@ -4,6 +4,7 @@ import '../core/theme/app_colors.dart';
 import '../core/theme/app_typography.dart';
 import '../services/location_service.dart';
 import '../core/utils/snackbar_utils.dart';
+import '../models/site.dart';
 
 class AttendanceCard extends StatefulWidget {
   final String? checkInTime;
@@ -13,6 +14,8 @@ class AttendanceCard extends StatefulWidget {
   final VoidCallback onPunchIn;
   final VoidCallback onPunchOut;
   final bool isPunchedIn;
+  final bool isAutoCheckoutEnabled;
+  final Site? checkInSite;
 
   const AttendanceCard({
     super.key,
@@ -23,6 +26,8 @@ class AttendanceCard extends StatefulWidget {
     required this.onPunchIn,
     required this.onPunchOut,
     required this.isPunchedIn,
+    this.isAutoCheckoutEnabled = false,
+    this.checkInSite,
   });
 
   @override
@@ -334,6 +339,39 @@ class _AttendanceCardState extends State<AttendanceCard> {
           const SizedBox(height: 16),
           _buildLocationSection(),
           const SizedBox(height: 16),
+          
+          // Auto checkout indicator
+          if (widget.isAutoCheckoutEnabled && widget.checkInSite != null) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.location_on,
+                    color: Colors.blue,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Auto checkout enabled for ${widget.checkInSite!.name} (${widget.checkInSite!.maxRange ?? 500}m range)',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: Colors.blue.shade700,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+          
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(

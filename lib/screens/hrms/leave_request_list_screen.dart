@@ -11,6 +11,8 @@ import '../../providers/user_provider.dart';
 import '../../services/api_service.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/clickable_user_name.dart';
+import '../../models/task.dart';
 import 'apply_expense_screen.dart';
 import 'apply_leave_screen.dart';
 
@@ -799,7 +801,7 @@ class _UserSearchDelegate extends SearchDelegate<Map<String, dynamic>?> {
       itemBuilder: (context, index) {
         final user = results[index];
         return ListTile(
-          title: Text(user['name'] ?? ''),
+          title: Text(user['name']),
           onTap: () => close(context, user),
         );
       },
@@ -814,7 +816,7 @@ class _UserSearchDelegate extends SearchDelegate<Map<String, dynamic>?> {
       itemBuilder: (context, index) {
         final user = suggestions[index];
         return ListTile(
-          title: Text(user['name'] ?? ''),
+          title: Text(user['name']),
           onTap: () => close(context, user),
         );
       },

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:nutanvij_electricals/core/utils/navigation_utils.dart';
+import 'package:nutanvij_electricals/core/utils/task_validation_utils.dart';
+import 'package:nutanvij_electricals/core/utils/snackbar_utils.dart';
 import 'package:nutanvij_electricals/screens/task/edit_task_screen.dart';
 import 'package:nutanvij_electricals/screens/task/update_task_progress_screen.dart';
+import 'package:nutanvij_electricals/screens/task/edit_task_progress_screen.dart';
 import 'package:nutanvij_electricals/widgets/custom_button.dart';
 import '../../models/task.dart';
 import '../../core/theme/app_colors.dart';
@@ -16,9 +19,9 @@ import '../../providers/user_provider.dart';
 import '../../services/api_service.dart';
 
 class TaskDetailsScreen extends StatefulWidget {
-  final Task task;
+  final String taskId;
 
-  const TaskDetailsScreen({Key? key, required this.task}) : super(key: key);
+  const TaskDetailsScreen({Key? key, required this.taskId}) : super(key: key);
 
   @override
   State<TaskDetailsScreen> createState() => _TaskDetailsScreenState();
@@ -26,7 +29,7 @@ class TaskDetailsScreen extends StatefulWidget {
 
 class _TaskDetailsScreenState extends State<TaskDetailsScreen>
     with SingleTickerProviderStateMixin {
-  late Task _task;
+  Task? _task;
   bool _isLoading = true;
   late TabController _tabController;
 
@@ -34,7 +37,6 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _task = widget.task;
     _loadTaskDetails();
   }
 
@@ -51,18 +53,20 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen>
       final updatedTask = await ApiService().getTaskDetail(
         context: context,
         apiToken: apiToken,
-        taskId: _task.id,
+        taskId: int.parse(widget.taskId),
       );
       setState(() {
         _task = updatedTask;
         _isLoading = false;
       });
     } catch (e) {
-      print('Error loading task details: $e');
-      // Keep the original task data if API call fails
       setState(() {
         _isLoading = false;
       });
+
+      if (mounted) {
+        SnackBarUtils.showError(context, 'Failed to load task details.');
+      }
     }
   }
 
@@ -73,24 +77,62 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen>
       final updatedTask = await ApiService().getTaskDetail(
         context: context,
         apiToken: apiToken,
-        taskId: _task.id,
+        taskId: int.parse(widget.taskId),
       );
       setState(() {
         _task = updatedTask;
       });
     } catch (e) {
-      // If getTaskDetail fails, fallback to getTaskList
-      final updatedTasks = await ApiService().getTaskList(
-        context: context,
-        apiToken: apiToken,
-        siteId: _task.siteId,
-      );
-      final updated =
-          updatedTasks.firstWhere((t) => t.id == _task.id, orElse: () => _task);
-      setState(() {
-        _task = updated;
-      });
+      // If getTaskDetail fails, we can't fallback since we don't have siteId
+      if (mounted) {
+        SnackBarUtils.showError(context, 'Failed to refresh task details.');
+      }
     }
+  }
+
+  Future<void> _approveProgress(TaskProgress progress, String action) async {
+    try {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final apiToken = userProvider.user?.data.apiToken ?? '';
+      
+      await ApiService().approveTaskProgress(
+        apiToken: apiToken,
+        progressId: progress.id,
+        action: action,
+      );
+      
+      SnackBarUtils.showSuccess(context, 'Progress ${action}d successfully!');
+      await _refreshTask();
+    } catch (e) {
+      SnackBarUtils.showError(context, e.toString());
+    }
+  }
+
+  Future<void> _changeProgressDecision(TaskProgress progress) async {
+    final currentStatus = progress.status.toLowerCase();
+    final newAction = (currentStatus == 'approved' || currentStatus == 'approve') ? 'reject' : 'approve';
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        title: const Text('Change Progress Decision'),
+        content: Text('Are you sure you want to $newAction this progress update?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _approveProgress(progress, newAction);
+            },
+            child: Text(newAction.toUpperCase()),
+          ),
+        ],
+      ),
+    );
   }
 
   Color getStatusColor(String status) {
@@ -103,6 +145,27 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen>
         return Colors.blue;
       case 'cancelled':
         return Colors.red;
+      case 'approved':
+        return Colors.green;
+      case 'rejected':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+
+
+  Color _getStatusTagColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'approved':
+      case 'approve':
+        return Colors.green;
+      case 'rejected':
+      case 'reject':
+        return Colors.red;
+      case 'pending':
+        return Colors.orange;
       default:
         return Colors.grey;
     }
@@ -110,7 +173,22 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen>
 
   @override
   Widget build(BuildContext context) {
-    final task = _task;
+    if (_task == null) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF7F8FA),
+        appBar: CustomAppBar(
+          title: 'Task Details',
+          onMenuPressed: () => Navigator.of(context).pop(),
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(
+            color: AppColors.primary,
+          ),
+        ),
+      );
+    }
+
+    final task = _task!;
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
       appBar: CustomAppBar(
@@ -124,7 +202,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen>
                 GestureDetector(
                   onTap: () async {
                     final shouldRefresh = await NavigationUtils.push(context,
-                        EditTaskScreen(task: task, siteId: widget.task.siteId));
+                        EditTaskScreen(task: task, siteId: task.siteId));
                     if (shouldRefresh == true) {
                       await _refreshTask();
                     }
@@ -227,7 +305,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen>
                                     ],
                                   ),
                                   child: Text(
-                                    'Task Completed on ${_formatDate(task.completedAt!)}',
+                                    'Task Completed on ${_formatDate(task.completedAt)}',
                                     style: AppTypography.bodyMedium.copyWith(
                                       color: Colors.white.withOpacity(0.9),
                                     ),
@@ -283,17 +361,18 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen>
 
   Widget _buildProgressTimeline(Task task) {
     final progress = task.progress ?? 0;
-    final totalWorkDone = task.totalWorkDone ?? 0;
-    final totalWork = task.totalWork ?? 100;
-    final unit = task.unit ?? '%';
 
-    print('Task Progress Count: ${task.taskProgress.length}');
-    print(
-        'Task Progress Data: ${task.taskProgress.map((p) => 'ID: ${p.id}, WorkDone: ${p.workDone}, CreatedAt: ${p.createdAt}').toList()}');
 
     final sortedProgress = List<TaskProgress>.from(task.taskProgress)
-      ..sort((a, b) =>
-          DateTime.parse(b.createdAt).compareTo(DateTime.parse(a.createdAt)));
+      ..sort((a, b) {
+        try {
+          final dateA = DateTime.parse(a.createdAt);
+          final dateB = DateTime.parse(b.createdAt);
+          return dateB.compareTo(dateA);
+        } catch (e) {
+          return 0;
+        }
+      });
 
     return Container(
       width: double.infinity,
@@ -343,7 +422,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen>
           ),
           const SizedBox(height: 16),
 
-          // Task Progress Timeline
+          // Progress Summary
           if (sortedProgress.isNotEmpty) ...[
             Text(
               'Progress Updates (${sortedProgress.length})',
@@ -423,15 +502,19 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen>
 
 
   Widget _buildProgressTimelineItem(TaskProgress progress) {
-    final utcDate = DateTime.parse(progress.createdAt);
+    DateTime utcDate;
+    try {
+      utcDate = DateTime.parse(progress.createdAt);
+    } catch (e) {
+      utcDate = DateTime.now();
+    }
+    
     // Convert UTC to IST by adding 5:30 hours
     final istDate = utcDate.add(const Duration(hours: 5, minutes: 30));
     final formattedDate = '${istDate.day}/${istDate.month}/${istDate.year}';
     final formattedTime =
         '${istDate.hour.toString().padLeft(2, '0')}:${istDate.minute.toString().padLeft(2, '0')}';
 
-    print(
-        'Progress Item - ID: ${progress.id}, WorkDone: ${progress.workDone}, Images: ${progress.taskProgressImage.length}, Attachments: ${progress.taskAttachment.length}');
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -462,11 +545,11 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen>
           Expanded(
             child: Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade200),
-              ),
+                              decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -529,7 +612,28 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen>
                   ),
 
                   const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Text(
+                        'Updated By: ',
+                        style: AppTypography.bodySmall.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      Text(
+                        progress.user!.name,
+                        style: AppTypography.bodySmall.copyWith(
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
 
+
+
+                    ],
+                  ),
+                  const SizedBox(height: 4),
                   // Remark
                   if (progress.remark.isNotEmpty) ...[
                     Text(
@@ -544,6 +648,148 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen>
                       progress.remark,
                       style: AppTypography.bodyMedium.copyWith(
                         color: Colors.black87,
+                      ),
+                    ),
+                  ],
+
+                  // Status and Approval Info
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _getStatusTagColor(progress.status),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          progress.status,
+                          style: AppTypography.bodySmall.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+
+                      // Action buttons
+                      const Spacer(),
+                      Row(
+                        children: [
+                          // Edit button (for user's own progress or admin, but not when task is 100% complete)
+                          if (TaskValidationUtils.canEditProgress(context, progress) && _task?.progress != 100) ...[
+                            GestureDetector(
+                              onTap: () async {
+                                final shouldRefresh = await NavigationUtils.push(
+                                  context,
+                                  EditTaskProgressScreen(progress: progress),
+                                );
+                                if (shouldRefresh == true) {
+                                  await _refreshTask();
+                                }
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: AppColors.primary),
+                                ),
+                                child: Text(
+                                  'Edit',
+                                  style: AppTypography.bodySmall.copyWith(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          
+                          // Approve/Reject buttons for pending items (admin only)
+                          if ((progress.status.toLowerCase() == 'pending') && TaskValidationUtils.canApproveProgress(context)) ...[
+                            GestureDetector(
+                              onTap: () => _approveProgress(progress, 'approve'),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: Colors.green),
+                                ),
+                                child: Text(
+                                  'Approve',
+                                  style: AppTypography.bodySmall.copyWith(
+                                    color: Colors.green,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () => _approveProgress(progress, 'reject'),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: Colors.red),
+                                ),
+                                child: Text(
+                                  'Reject',
+                                  style: AppTypography.bodySmall.copyWith(
+                                    color: Colors.red,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                          
+                          // Change decision button for approved/rejected items (admin only)
+                          if ((progress.status.toLowerCase() == 'approved' || progress.status.toLowerCase() == 'approve' || 
+                               progress.status.toLowerCase() == 'rejected' || progress.status.toLowerCase() == 'reject') && 
+                              TaskValidationUtils.canApproveProgress(context)) ...[
+                            GestureDetector(
+                              onTap: () => _changeProgressDecision(progress),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: Colors.orange),
+                                ),
+                                child: Text(
+                                  'Change',
+                                  style: AppTypography.bodySmall.copyWith(
+                                    color: Colors.orange,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                  if (progress.approvedBy != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      progress.status.toLowerCase() == 'rejected' || progress.status.toLowerCase() == 'reject' ? 'Rejected by: ${progress.approvedBy!.name}' : 'Approved by: ${progress.approvedBy!.name}',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                  // Approval/Rejection Date
+                  if (progress.approvedAt != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      progress.status.toLowerCase() == 'rejected' || progress.status.toLowerCase() == 'reject' ? 'Rejected on: ${_formatDate(progress.approvedAt)}' : 'Approved on: ${_formatDate(progress.approvedAt)}',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: Colors.grey.shade600,
                       ),
                     ),
                   ],
@@ -621,7 +867,9 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen>
                       spacing: 8,
                       runSpacing: 4,
                       children: progress.taskAttachment.map((attachment) {
-                        final fileName = attachment.file.split('/').last;
+                        final fileName = attachment.file.isNotEmpty 
+                            ? attachment.file.split('/').last 
+                            : 'Unknown File';
                         return GestureDetector(
                           onTap: () {
                             Navigator.of(context).push(
@@ -687,7 +935,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen>
         ),
         const SizedBox(height: 2),
         Text(
-          '$value ${unit ?? ''}',
+          '${value.isNotEmpty ? value : '0'} ${unit ?? ''}',
           style: AppTypography.bodyMedium.copyWith(
             fontWeight: FontWeight.w600,
             color: Colors.black87,
@@ -761,9 +1009,30 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildDetailRow('Start Date', task.startDate),
+          Row(
+            children: [
+              Expanded(
+                child: _buildDetailRow('Start Date', task.startDate),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: getStatusColor(task.status).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: getStatusColor(task.status)),
+                ),
+                child: Text(
+                  task.status.toUpperCase(),
+                  style: AppTypography.bodySmall.copyWith(
+                    color: getStatusColor(task.status),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
           _buildDetailRow('End Date', task.endDate),
-          _buildDetailRow('Created By', task.createdBy.toString()),
+                            _buildDetailRow('Created By', task.createdBy?.name ?? 'Unknown'),
           _buildDetailRow('Tags', task.tags.isEmpty ? "No tags" : "Tags"),
         ],
       ),
@@ -983,7 +1252,9 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen>
             itemCount: task.taskAttachments.length,
             itemBuilder: (context, idx) {
               final att = task.taskAttachments[idx];
-              final fileName = att.file.split('/').last;
+              final fileName = att.file.isNotEmpty 
+                  ? att.file.split('/').last 
+                  : 'Unknown File';
               return GestureDetector(
                 onTap: () {
                   Navigator.of(context).push(
@@ -1035,14 +1306,21 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen>
   }
 
   String _getInitials(String name) {
+    if (name.isEmpty) return '?';
     final parts = name.trim().split(' ');
-    if (parts.length == 1) return parts[0].substring(0, 1).toUpperCase();
-    return (parts[0].substring(0, 1) + parts.last.substring(0, 1))
-        .toUpperCase();
+    if (parts.length == 1) {
+      return parts[0].isNotEmpty ? parts[0].substring(0, 1).toUpperCase() : '?';
+    }
+    final first = parts[0].isNotEmpty ? parts[0].substring(0, 1) : '';
+    final last = parts.last.isNotEmpty ? parts.last.substring(0, 1) : '';
+    return (first + last).toUpperCase();
   }
 
   IconData _getAttachmentIcon(String fileName) {
-    final ext = fileName.split('.').last.toLowerCase();
+    if (fileName.isEmpty) return Icons.attach_file;
+    final parts = fileName.split('.');
+    if (parts.length < 2) return Icons.attach_file;
+    final ext = parts.last.toLowerCase();
     if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].contains(ext)) {
       return Icons.image;
     } else if (['pdf'].contains(ext)) {
@@ -1061,7 +1339,10 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen>
   }
 
   Color _getAttachmentIconColor(String fileName) {
-    final ext = fileName.split('.').last.toLowerCase();
+    if (fileName.isEmpty) return AppColors.primary;
+    final parts = fileName.split('.');
+    if (parts.length < 2) return AppColors.primary;
+    final ext = parts.last.toLowerCase();
     if (['pdf'].contains(ext)) return Colors.red;
     if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].contains(ext))
       return Colors.orange;
@@ -1072,25 +1353,24 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen>
     return AppColors.primary;
   }
 
-  String _formatDate(String dateString) {
+  String _formatDate(String? dateString) {
+    if (dateString == null || dateString.isEmpty) {
+      return 'N/A';
+    }
+    
     try {
-      print('Original date string: $dateString');
-      
+
       // Parse the UTC date
       final utcDate = DateTime.parse(dateString);
-      print('Parsed UTC date: $utcDate');
-      
+
       // Force convert to IST by adding 5 hours 30 minutes
       final istDate = utcDate.add(const Duration(hours: 5, minutes: 30));
-      print('Converted to IST: $istDate');
-      
+
       // Format as DD/MM/YYYY
       final formattedDate = '${istDate.day.toString().padLeft(2, '0')}/${istDate.month.toString().padLeft(2, '0')}/${istDate.year}';
-      print('Final formatted date: $formattedDate');
-      
+
       return formattedDate;
     } catch (e) {
-      print('Error parsing date: $e');
       return dateString;
     }
   }

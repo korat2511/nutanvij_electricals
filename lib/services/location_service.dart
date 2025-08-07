@@ -44,8 +44,8 @@ class LocationService {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
         throw Exception('Location permissions are denied');
-                }
-              }
+      }
+    }
     
     if (permission == LocationPermission.deniedForever) {
       throw Exception(
@@ -54,10 +54,23 @@ class LocationService {
 
     // When we reach here, permissions are granted and we can
     // continue accessing the position of the device.
-    return await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-      timeLimit: const Duration(seconds: 10),
-    );
+    try {
+      return await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.medium, // Use medium accuracy for faster response
+        timeLimit: const Duration(seconds: 15), // Increased timeout for better reliability
+      );
+    } catch (e) {
+      // If high accuracy fails, try with lower accuracy
+      try {
+        return await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.low, // Fallback to low accuracy
+          timeLimit: const Duration(seconds: 10), // Shorter timeout for fallback
+        );
+      } catch (fallbackError) {
+        // If both fail, throw the original error
+        throw Exception('Failed to get location. Please check your GPS and try again. Error: $e');
+      }
+    }
   }
 
   static Future<LocationResult> getCurrentAddressWithRetry() async {

@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
 	<key>API_KEY</key>
-	<string>AIzaSyAHYl34XKC_t9hN84JHQdGs0_ZAN5Le14w</string>
+	<string>AIzaSyA3okrtKFLn5HNk6ewCmvWQBtlRA0AHKls</string>
 	<key>GCM_SENDER_ID</key>
 	<string>287946113595</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.nutanvij.nutanvijElectricals</string>
+	<string>com.nepl.nutanvijElectricals</string>
 	<key>PROJECT_ID</key>
 	<string>nutanvij-electricals</string>
 	<key>STORAGE_BUCKET</key>
@@ -25,6 +25,8 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:287946113595:ios:498120ec0e8aec6dcb121e</string>
+	<string>1:287946113595:ios:ed6f9bb8850410a9cb121e</string>
+	<key>DATABASE_URL</key>
+	<string>https://nutanvij-electricals-default-rtdb.asia-southeast1.firebasedatabase.app</string>
 </dict>
 </plist>

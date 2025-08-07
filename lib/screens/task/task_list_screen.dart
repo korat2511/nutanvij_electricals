@@ -25,11 +25,17 @@ class TaskListScreen extends StatefulWidget {
 
 class _TaskListScreenState extends State<TaskListScreen> {
   bool _isLoading = true;
+  bool _isLoadingMore = false;
   String? _error;
   List<Task> _tasks = [];
   List<Task> _filteredTasks = [];
   final TextEditingController _searchController = TextEditingController();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final ScrollController _scrollController = ScrollController();
+  
+  // Pagination variables
+  int _currentPage = 1;
+  bool _hasMoreData = true;
   
   // Filter variables
   final String _searchQuery = '';
@@ -50,11 +56,13 @@ class _TaskListScreenState extends State<TaskListScreen> {
     _fetchTasks();
     _loadUsersAndTags();
     _searchController.addListener(_onSearchChanged);
+    _scrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -81,7 +89,7 @@ class _TaskListScreenState extends State<TaskListScreen> {
     });
     try {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
-      print('Fetching tasks with filters: search=$_searchQuery, status=$_selectedStatus, userId=$_selectedUserIds, tags=$_selectedTagIds');
+
       final tasks = await ApiService().getTaskList(
         context: context,
         apiToken: userProvider.user?.data.apiToken ?? '',
@@ -90,10 +98,13 @@ class _TaskListScreenState extends State<TaskListScreen> {
         status: _selectedStatus,
         userId: _selectedUserIds.isNotEmpty ? _selectedUserIds.first : null,
         tags: _selectedTagIds.isNotEmpty ? _selectedTagIds.join(',') : null,
+        page: 1,
       );
       setState(() {
         _tasks = tasks;
         _filteredTasks = tasks;
+        _currentPage = 1;
+        _hasMoreData = tasks.isNotEmpty;
         _isLoading = false;
       });
     } catch (e) {
@@ -145,7 +156,7 @@ class _TaskListScreenState extends State<TaskListScreen> {
                   _selectedStatus = value ?? '';
                   _isFilterApplied = _selectedStatus.isNotEmpty || _selectedUserIds.isNotEmpty || _selectedTagIds.isNotEmpty;
                 });
-                _fetchTasks();
+                _resetPaginationAndFetch();
                 Navigator.pop(context);
               },
             ),
@@ -158,7 +169,7 @@ class _TaskListScreenState extends State<TaskListScreen> {
                   _selectedStatus = value ?? '';
                   _isFilterApplied = _selectedStatus.isNotEmpty || _selectedUserIds.isNotEmpty || _selectedTagIds.isNotEmpty;
                 });
-                _fetchTasks();
+                _resetPaginationAndFetch();
                 Navigator.pop(context);
               },
             ),
@@ -171,7 +182,20 @@ class _TaskListScreenState extends State<TaskListScreen> {
                   _selectedStatus = value ?? '';
                   _isFilterApplied = _selectedStatus.isNotEmpty || _selectedUserIds.isNotEmpty || _selectedTagIds.isNotEmpty;
                 });
-                _fetchTasks();
+                _resetPaginationAndFetch();
+                Navigator.pop(context);
+              },
+            ),
+            RadioListTile<String>(
+              title: Text('Overdue', style: AppTypography.bodyMedium),
+              value: 'overdue',
+              groupValue: _selectedStatus,
+              onChanged: (value) {
+                setState(() {
+                  _selectedStatus = value ?? '';
+                  _isFilterApplied = _selectedStatus.isNotEmpty || _selectedUserIds.isNotEmpty || _selectedTagIds.isNotEmpty;
+                });
+                _resetPaginationAndFetch();
                 Navigator.pop(context);
               },
             ),
@@ -184,7 +208,7 @@ class _TaskListScreenState extends State<TaskListScreen> {
                   _selectedStatus = value ?? '';
                   _isFilterApplied = _selectedStatus.isNotEmpty || _selectedUserIds.isNotEmpty || _selectedTagIds.isNotEmpty;
                 });
-                _fetchTasks();
+                _resetPaginationAndFetch();
                 Navigator.pop(context);
               },
             ),
@@ -195,46 +219,115 @@ class _TaskListScreenState extends State<TaskListScreen> {
   }
 
   void _showUsersDialog() {
+    final TextEditingController searchController = TextEditingController();
+    List<UserInSite> filteredUsers = List.from(_cachedUsers);
+    
     showDialog(
       context: context,
       barrierDismissible: true,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
-          return AlertDialog(
-            title: Text('Select Users', style: AppTypography.titleMedium),
-            content: SizedBox(
+          return Dialog(
+            backgroundColor: Colors.white,
+            child: Container(
               width: double.maxFinite,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: _cachedUsers.map((user) {
-                    final isSelected = _selectedUserIds.contains(user.id);
-                    return CheckboxListTile(
-                      title: Text(user.name, style: AppTypography.bodyMedium),
-                      value: isSelected,
-                      onChanged: (bool? value) {
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.8,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Header
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Select Users',
+                            style: AppTypography.titleMedium.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.close),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  // Search field
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: TextField(
+                      controller: searchController,
+                      decoration: InputDecoration(
+                        hintText: 'Search users...',
+                        prefixIcon: const Icon(Icons.search),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                      onChanged: (value) {
                         setDialogState(() {
-                          if (value == true) {
-                            _selectedUserIds.add(user.id);
+                          if (value.isEmpty) {
+                            filteredUsers = List.from(_cachedUsers);
                           } else {
-                            _selectedUserIds.remove(user.id);
+                            filteredUsers = _cachedUsers
+                                .where((user) => user.name.toLowerCase().contains(value.toLowerCase()))
+                                .toList();
                           }
-                          _isFilterApplied = _selectedStatus.isNotEmpty || _selectedUserIds.isNotEmpty || _selectedTagIds.isNotEmpty;
                         });
-                        setState(() {});
-                        _fetchTasks();
                       },
-                    );
-                  }).toList(),
-                ),
+                    ),
+                  ),
+                  // Users list
+                  Flexible(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: filteredUsers.length,
+                      itemBuilder: (context, index) {
+                        final user = filteredUsers[index];
+                        final isSelected = _selectedUserIds.contains(user.id);
+                        return CheckboxListTile(
+                          title: Text(user.name, style: AppTypography.bodyMedium),
+                          value: isSelected,
+                          onChanged: (bool? value) {
+                            setDialogState(() {
+                              if (value == true) {
+                                _selectedUserIds.add(user.id);
+                              } else {
+                                _selectedUserIds.remove(user.id);
+                              }
+                              _isFilterApplied = _selectedStatus.isNotEmpty || _selectedUserIds.isNotEmpty || _selectedTagIds.isNotEmpty;
+                            });
+                            setState(() {});
+                            _resetPaginationAndFetch();
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                  // Footer
+                  const Divider(height: 1),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: Text('Select', style: AppTypography.bodyMedium),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text('Select', style: AppTypography.bodyMedium),
-              ),
-            ],
           );
         },
       ),
@@ -242,46 +335,115 @@ class _TaskListScreenState extends State<TaskListScreen> {
   }
 
   void _showTagsDialog() {
+    final TextEditingController searchController = TextEditingController();
+    List<Tag> filteredTags = List.from(_cachedTags);
+    
     showDialog(
       context: context,
       barrierDismissible: true,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
-          return AlertDialog(
-            title: Text('Select Tags', style: AppTypography.titleMedium),
-            content: SizedBox(
+          return Dialog(
+            backgroundColor: Colors.white,
+            child: Container(
               width: double.maxFinite,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: _cachedTags.map((tag) {
-                    final isSelected = _selectedTagIds.contains(tag.id);
-                    return CheckboxListTile(
-                      title: Text(tag.name, style: AppTypography.bodyMedium),
-                      value: isSelected,
-                      onChanged: (bool? value) {
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.8,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Header
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Select Tags',
+                            style: AppTypography.titleMedium.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.close),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  // Search field
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: TextField(
+                      controller: searchController,
+                      decoration: InputDecoration(
+                        hintText: 'Search tags...',
+                        prefixIcon: const Icon(Icons.search),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                      onChanged: (value) {
                         setDialogState(() {
-                          if (value == true) {
-                            _selectedTagIds.add(tag.id);
+                          if (value.isEmpty) {
+                            filteredTags = List.from(_cachedTags);
                           } else {
-                            _selectedTagIds.remove(tag.id);
+                            filteredTags = _cachedTags
+                                .where((tag) => tag.name.toLowerCase().contains(value.toLowerCase()))
+                                .toList();
                           }
-                          _isFilterApplied = _selectedStatus.isNotEmpty || _selectedUserIds.isNotEmpty || _selectedTagIds.isNotEmpty;
                         });
-                        setState(() {});
-                        _fetchTasks();
                       },
-                    );
-                  }).toList(),
-                ),
+                    ),
+                  ),
+                  // Tags list
+                  Flexible(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: filteredTags.length,
+                      itemBuilder: (context, index) {
+                        final tag = filteredTags[index];
+                        final isSelected = _selectedTagIds.contains(tag.id);
+                        return CheckboxListTile(
+                          title: Text(tag.name, style: AppTypography.bodyMedium),
+                          value: isSelected,
+                          onChanged: (bool? value) {
+                            setDialogState(() {
+                              if (value == true) {
+                                _selectedTagIds.add(tag.id);
+                              } else {
+                                _selectedTagIds.remove(tag.id);
+                              }
+                              _isFilterApplied = _selectedStatus.isNotEmpty || _selectedUserIds.isNotEmpty || _selectedTagIds.isNotEmpty;
+                            });
+                            setState(() {});
+                            _resetPaginationAndFetch();
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                  // Footer
+                  const Divider(height: 1),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: Text('Select', style: AppTypography.bodyMedium),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text('Select', style: AppTypography.bodyMedium),
-              ),
-            ],
           );
         },
       ),
@@ -312,6 +474,56 @@ class _TaskListScreenState extends State<TaskListScreen> {
     } catch (e) {
       // Handle error silently
     }
+  }
+
+  Future<void> _loadMoreTasks() async {
+    if (_isLoadingMore || !_hasMoreData) return;
+
+    setState(() {
+      _isLoadingMore = true;
+    });
+
+    try {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final tasks = await ApiService().getTaskList(
+        context: context,
+        apiToken: userProvider.user?.data.apiToken ?? '',
+        siteId: widget.siteId,
+        search: _searchQuery,
+        status: _selectedStatus,
+        userId: _selectedUserIds.isNotEmpty ? _selectedUserIds.first : null,
+        tags: _selectedTagIds.isNotEmpty ? _selectedTagIds.join(',') : null,
+        page: _currentPage + 1,
+      );
+
+             setState(() {
+         _tasks.addAll(tasks);
+         _filteredTasks.addAll(tasks);
+         _currentPage++;
+         _hasMoreData = tasks.isNotEmpty;
+         _isLoadingMore = false;
+       });
+    } catch (e) {
+      print('Error loading more tasks: $e');
+      setState(() {
+        _isLoadingMore = false;
+      });
+      SnackBarUtils.showError(context, e.toString());
+    }
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      if (!_isLoadingMore && _hasMoreData) {
+        _loadMoreTasks();
+      }
+    }
+  }
+
+  void _resetPaginationAndFetch() {
+    _currentPage = 1;
+    _hasMoreData = true;
+    _fetchTasks();
   }
 
 
@@ -378,12 +590,33 @@ class _TaskListScreenState extends State<TaskListScreen> {
                       : _filteredTasks.isEmpty
                           ? Center(child: Text(_tasks.isEmpty ? 'No tasks found.' : 'No tasks match your search.', style: AppTypography.bodyMedium))
                           : ListView(
+                              controller: _scrollController,
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                               children: [
                                 ..._filteredTasks.map((task) => _TaskCard(
                                       task: task,
-                                      onTap: () => NavigationUtils.push(context, TaskDetailsScreen(task: task)),
+                                      onTap: () => NavigationUtils.push(context, TaskDetailsScreen(taskId: task.id.toString())),
                                     )),
+                                if (_isLoadingMore)
+                                  const Padding(
+                                    padding: EdgeInsets.all(16.0),
+                                    child: Center(
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  ),
+                                if (!_hasMoreData && _filteredTasks.isNotEmpty)
+                                  const Padding(
+                                    padding: EdgeInsets.all(16.0),
+                                    child: Center(
+                                      child: Text(
+                                        'No more tasks to load',
+                                        style: TextStyle(
+                                          color: Colors.grey,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                               ],
                             ),
             ),
@@ -420,6 +653,8 @@ class _TaskCard extends StatelessWidget {
         return Colors.orange;
       case 'active':
         return Colors.green;
+      case 'overdue':
+        return Colors.red;
       case 'completed':
         return Colors.blue;
       case 'cancelled':

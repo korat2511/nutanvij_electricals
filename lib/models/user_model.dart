@@ -1,4 +1,5 @@
 import 'package:nutanvij_electricals/models/designation.dart';
+import 'package:nutanvij_electricals/models/site.dart';
 
 class UserModel {
   final int status;
@@ -32,6 +33,46 @@ class UserModel {
   }
 }
 
+class SubDepartment {
+  final int id;
+  final int departmentId;
+  final String name;
+  final String createdAt;
+  final String updatedAt;
+  final String? deletedAt;
+
+  SubDepartment({
+    required this.id,
+    required this.departmentId,
+    required this.name,
+    required this.createdAt,
+    required this.updatedAt,
+    this.deletedAt,
+  });
+
+  factory SubDepartment.fromJson(Map<String, dynamic> json) {
+    return SubDepartment(
+      id: json['id'] ?? 0,
+      departmentId: json['department_id'] ?? 0,
+      name: json['name'] ?? '',
+      createdAt: json['created_at'] ?? '',
+      updatedAt: json['updated_at'] ?? '',
+      deletedAt: json['deleted_at'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'department_id': departmentId,
+      'name': name,
+      'created_at': createdAt,
+      'updated_at': updatedAt,
+      'deleted_at': deletedAt,
+    };
+  }
+}
+
 class UserData {
   final int id;
   final String name;
@@ -48,6 +89,7 @@ class UserData {
   final int? salaryAccountId;
   final String? employeeId;
   final int? subDepartmentId;
+  final int isCheckInExmpted;
   final String? salary;
   final String? dob;
   final String? dateOfJoining;
@@ -64,6 +106,10 @@ class UserData {
   final String? addharCardBackPath;
   final String? panCardImagePath;
   final String? passbookImagePath;
+  final String? documentStatus;
+  final int hasKeypadMobile;
+  final SubDepartment? subDepartment;
+  final List<Site> sites;
 
   UserData({
     required this.id,
@@ -81,6 +127,7 @@ class UserData {
     this.salaryAccountId,
     this.employeeId,
     this.subDepartmentId,
+    this.isCheckInExmpted = 0,
     this.salary,
     this.dob,
     this.dateOfJoining,
@@ -97,6 +144,10 @@ class UserData {
     this.addharCardBackPath,
     this.panCardImagePath,
     this.passbookImagePath,
+    this.documentStatus,
+    this.hasKeypadMobile = 0,
+    this.subDepartment,
+    this.sites = const [],
   });
 
   factory UserData.fromJson(Map<String, dynamic> json) {
@@ -122,6 +173,7 @@ class UserData {
       subDepartmentId: json['sub_department_id'] is int
           ? json['sub_department_id']
           : int.tryParse(json['sub_department_id']?.toString() ?? '0'),
+      isCheckInExmpted: json['is_checkin_exmpted'] ?? 0,
       salary: json['salary'],
       dob: json['dob'],
       dateOfJoining: json['date_of_joining'],
@@ -138,6 +190,14 @@ class UserData {
       addharCardBackPath: json['addhar_card_back_path'],
       panCardImagePath: json['pan_card_image_path'],
       passbookImagePath: json['passbook_image_path'],
+      documentStatus: json['document_status'],
+      hasKeypadMobile: json['has_keypad_mobile'] ?? 0,
+      subDepartment: json['sub_department'] != null 
+          ? SubDepartment.fromJson(json['sub_department'])
+          : null,
+      sites: json['sites'] != null 
+          ? (json['sites'] as List).map((site) => Site.fromJson(site)).toList()
+          : [],
     );
   }
 
@@ -158,6 +218,7 @@ class UserData {
       'salary_account_id': salaryAccountId,
       'employee_id': employeeId,
       'sub_department_id': subDepartmentId,
+      'is_checkin_exmpted' : isCheckInExmpted,
       'salary': salary,
       'dob': dob,
       'date_of_joining': dateOfJoining,
@@ -174,6 +235,10 @@ class UserData {
       'addhar_card_back_path': addharCardBackPath,
       'pan_card_image_path': panCardImagePath,
       'passbook_image_path': passbookImagePath,
+      'document_status': documentStatus,
+      'has_keypad_mobile': hasKeypadMobile,
+      'sub_department': subDepartment?.toJson(),
+      'sites': sites.map((site) => site.toJson()).toList(),
     };
   }
 } 

@@ -54,15 +54,18 @@ class DefaultFirebaseOptions {
     appId: '1:287946113595:android:ce734a12d1b824adcb121e',
     messagingSenderId: '287946113595',
     projectId: 'nutanvij-electricals',
+    databaseURL: 'https://nutanvij-electricals-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'nutanvij-electricals.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyAHYl34XKC_t9hN84JHQdGs0_ZAN5Le14w',
-    appId: '1:287946113595:ios:498120ec0e8aec6dcb121e',
+    apiKey: 'AIzaSyA3okrtKFLn5HNk6ewCmvWQBtlRA0AHKls',
+    appId: '1:287946113595:ios:ed6f9bb8850410a9cb121e',
     messagingSenderId: '287946113595',
     projectId: 'nutanvij-electricals',
+    databaseURL: 'https://nutanvij-electricals-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'nutanvij-electricals.firebasestorage.app',
-    iosBundleId: 'com.nutanvij.nutanvijElectricals',
+    iosBundleId: 'com.nepl.nutanvijElectricals',
   );
+
 }

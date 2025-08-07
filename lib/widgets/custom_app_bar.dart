@@ -5,9 +5,12 @@ import 'package:provider/provider.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_typography.dart';
 import '../core/utils/responsive.dart';
+import '../core/utils/navigation_utils.dart';
 import '../providers/user_provider.dart';
+import '../services/notification_storage_service.dart';
+import '../screens/notifications_screen.dart';
 
-class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
+class CustomAppBar extends StatefulWidget implements PreferredSizeWidget {
   final VoidCallback? onMenuPressed;
   final bool showProfilePicture;
   final bool showNotification;
@@ -27,6 +30,47 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Size get preferredSize => Size.fromHeight(height);
+
+  @override
+  State<CustomAppBar> createState() => _CustomAppBarState();
+}
+
+// Global key to access the app bar state
+final GlobalKey<_CustomAppBarState> customAppBarKey = GlobalKey<_CustomAppBarState>();
+
+class _CustomAppBarState extends State<CustomAppBar> {
+  int _unreadCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUnreadCount();
+  }
+
+  Future<void> _loadUnreadCount() async {
+    try {
+      final count = await NotificationStorageService.getUnreadCount();
+      if (mounted) {
+        setState(() {
+          _unreadCount = count;
+        });
+      }
+    } catch (e) {
+      print('Error loading unread count: $e');
+    }
+  }
+
+  void _onNotificationTap() {
+    NavigationUtils.push(context, const NotificationsScreen()).then((_) {
+      // Refresh unread count when returning from notifications screen
+      _loadUnreadCount();
+    });
+  }
+
+  // Method to refresh unread count from outside
+  void refreshUnreadCount() {
+    _loadUnreadCount();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,12 +107,13 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
               ],
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
+                // Left side: Menu and Title/Logo
+                Expanded(
+                  child: Row(
                   children: [
                     GestureDetector(
-                      onTap: onMenuPressed,
+                        onTap: widget.onMenuPressed,
                       child: Container(
                         height: Responsive.getIconSize(context),
                         width: Responsive.getIconSize(context),
@@ -80,32 +125,35 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                       ),
                     ),
                     SizedBox(width: Responsive.spacingM,),
-                    title != null && title!.isNotEmpty
+                      Expanded(
+                        child: widget.title != null && widget.title!.isNotEmpty
                         ? Text(
-                            title!,
+                                widget.title!,
                             style: AppTypography.titleLarge.copyWith(
                               fontWeight: FontWeight.w600,
                               color: AppColors.textPrimary,
                             ),
+                                overflow: TextOverflow.ellipsis,
                           )
                         : Image.asset(
                       'assets/images/NEPL_LOGO.png',
                       height: Responsive.getLogoHeight(context),
+                        ),
                     ),
                   ],
+                  ),
                 ),
 
-                // Right: Notification & Profile & Actions
+                // Right side: Actions, Notification, Profile
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (actions != null) ...actions!,
-                    if (showNotification) ...[
+                    if (widget.actions != null) ...widget.actions!,
+                    if (widget.showNotification) ...[
                       Stack(
                         children: [
                           IconButton(
-                            onPressed: () {
-                              // Handle notification tap
-                            },
+                            onPressed: _onNotificationTap,
                             icon: Icon(
                               Icons.notifications_outlined,
                               color: AppColors.textPrimary,
@@ -114,6 +162,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
                           ),
+                          if (_unreadCount > 0)
                           Positioned(
                             right: 0,
                             top: 0,
@@ -124,7 +173,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                                 shape: BoxShape.circle,
                               ),
                               child: Text(
-                                '1',
+                                  _unreadCount > 99 ? '99+' : _unreadCount.toString(),
                                 style: AppTypography.labelSmall.copyWith(
                                   color: Colors.white,
                                   fontSize: Responsive.spacingXS * 2,
@@ -136,7 +185,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                       ),
                       SizedBox(width: Responsive.spacingM),
                     ],
-                    if (showProfilePicture)
+                    if (widget.showProfilePicture)
                       GestureDetector(
                         onTap: () {
                           // Handle profile tap

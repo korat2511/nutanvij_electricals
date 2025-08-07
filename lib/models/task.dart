@@ -7,7 +7,7 @@ class Task {
   final String startDate;
   final String endDate;
   final String status;
-  final int createdBy;
+  final AssignUser? createdBy;
   final String? deletedAt;
   final String createdAt;
   final String updatedAt;
@@ -30,7 +30,7 @@ class Task {
     required this.startDate,
     required this.endDate,
     required this.status,
-    required this.createdBy,
+    this.createdBy,
     required this.deletedAt,
     required this.createdAt,
     required this.updatedAt,
@@ -48,22 +48,37 @@ class Task {
   });
 
   factory Task.fromJson(Map<String, dynamic> json) {
+    // Handle createdBy field which can be either an int (user ID) or an AssignUser object
+    AssignUser? createdByUser;
+    if (json['created_by'] != null) {
+      if (json['created_by'] is Map<String, dynamic>) {
+        // It's an AssignUser object
+        createdByUser = AssignUser.fromJson(json['created_by']);
+      } else if (json['created_by'] is int) {
+        // It's a user ID, create a minimal AssignUser object
+        createdByUser = AssignUser(
+          id: json['created_by'],
+          name: 'User ${json['created_by']}', // Fallback name
+        );
+      }
+    }
+
     return Task(
       id: json['id'],
-      name: json['name'],
+      name: json['name']?.toString() ?? '',
       siteId: json['site_id'],
-      startDate: json['start_date'],
-      endDate: json['end_date'],
-      status: json['status'],
-      createdBy: json['created_by'],
-      deletedAt: json['deleted_at'],
-      createdAt: json['created_at'],
-      updatedAt: json['updated_at'],
-      completedAt: json['completed_at'],
+      startDate: json['start_date']?.toString() ?? '',
+      endDate: json['end_date']?.toString() ?? '',
+      status: json['status']?.toString() ?? '',
+      createdBy: createdByUser,
+      deletedAt: json['deleted_at']?.toString(),
+      createdAt: json['created_at']?.toString() ?? '',
+      updatedAt: json['updated_at']?.toString() ?? '',
+      completedAt: json['completed_at']?.toString(),
       completedBy: json['completed_by'],
       progress: json['progress'],
       totalWorkDone: json['total_work_done'],
-      unit: json['unit'],
+      unit: json['unit']?.toString(),
       totalWork: json['total_work'],
       assignUser: (json['assign_user'] as List<dynamic>?)?.map((e) => AssignUser.fromJson(e)).toList() ?? [],
       taskImages: (json['task_images'] as List<dynamic>?)?.map((e) => TaskImage.fromJson(e)).toList() ?? [],
@@ -100,13 +115,13 @@ class AssignUser {
   factory AssignUser.fromJson(Map<String, dynamic> json) {
     return AssignUser(
       id: json['id'],
-      name: json['name'],
-      image: json['image'],
-      imagePath: json['image_path'],
-      addharCardFrontPath: json['addhar_card_front_path'],
-      addharCardBackPath: json['addhar_card_back_path'],
-      panCardImagePath: json['pan_card_image_path'],
-      passbookImagePath: json['passbook_image_path'],
+      name: json['name']?.toString() ?? '',
+      image: json['image']?.toString(),
+      imagePath: json['image_path']?.toString(),
+      addharCardFrontPath: json['addhar_card_front_path']?.toString(),
+      addharCardBackPath: json['addhar_card_back_path']?.toString(),
+      panCardImagePath: json['pan_card_image_path']?.toString(),
+      passbookImagePath: json['passbook_image_path']?.toString(),
       pivot: json['pivot'] != null ? Pivot.fromJson(json['pivot']) : null,
     );
   }
@@ -151,12 +166,12 @@ class TaskImage {
     return TaskImage(
       id: json['id'],
       taskId: json['task_id'],
-      image: json['image'],
+      image: json['image']?.toString() ?? '',
       createdBy: json['created_by'],
       deletedAt: json['deleted_at'],
       createdAt: json['created_at'],
       updatedAt: json['updated_at'],
-      imageUrl: json['image_url'],
+      imageUrl: json['image_url']?.toString() ?? '',
     );
   }
 }
@@ -182,7 +197,7 @@ class TaskAttachment {
     return TaskAttachment(
       id: json['id'],
       taskId: json['task_id'],
-      file: json['file'],
+      file: json['file']?.toString() ?? '',
       deletedAt: json['deleted_at'],
       createdAt: json['created_at'],
       updatedAt: json['updated_at'],
@@ -201,9 +216,13 @@ class TaskProgress {
   final String createdAt;
   final String updatedAt;
   final String? deletedAt;
+  final AssignUser? approvedBy;
+  final String? approvedAt;
+  final String status;
   final List<TaskProgressImage> taskProgressImage;
   final List<TaskRemark> taskRemark;
   final List<TaskProgressAttachment> taskAttachment;
+  final AssignUser? user;
 
   TaskProgress({
     required this.id,
@@ -216,9 +235,13 @@ class TaskProgress {
     required this.createdAt,
     required this.updatedAt,
     this.deletedAt,
+    this.approvedBy,
+    this.approvedAt,
+    required this.status,
     required this.taskProgressImage,
     required this.taskRemark,
     required this.taskAttachment,
+    this.user,
   });
 
   factory TaskProgress.fromJson(Map<String, dynamic> json) {
@@ -226,16 +249,20 @@ class TaskProgress {
       id: json['id'],
       taskId: json['task_id'],
       userId: json['user_id'],
-      workDone: json['work_done'],
-      workLeft: json['work_left'],
+      workDone: json['work_done']?.toString() ?? '0',
+      workLeft: json['work_left']?.toString() ?? '0',
       unit: json['unit'],
-      remark: json['remark'],
+      remark: json['remark']?.toString() ?? '',
       createdAt: json['created_at'],
       updatedAt: json['updated_at'],
       deletedAt: json['deleted_at'],
+      approvedBy: json['approved_by'] != null ? AssignUser.fromJson(json['approved_by']) : null,
+      approvedAt: json['approved_at']?.toString(),
+      status: json['status']?.toString() ?? 'Pending',
       taskProgressImage: (json['task_progress_image'] as List<dynamic>?)?.map((e) => TaskProgressImage.fromJson(e)).toList() ?? [],
       taskRemark: (json['task_remark'] as List<dynamic>?)?.map((e) => TaskRemark.fromJson(e)).toList() ?? [],
       taskAttachment: (json['task_attachment'] as List<dynamic>?)?.map((e) => TaskProgressAttachment.fromJson(e)).toList() ?? [],
+      user: json['user'] != null ? AssignUser.fromJson(json['user']) : null,
     );
   }
 }
@@ -266,11 +293,11 @@ class TaskProgressImage {
       id: json['id'],
       taskProgressId: json['task_progress_id'],
       userId: json['user_id'],
-      image: json['image'],
+      image: json['image']?.toString() ?? '',
       createdAt: json['created_at'],
       updatedAt: json['updated_at'],
       deletedAt: json['deleted_at'],
-      imageUrl: json['image_url'],
+      imageUrl: json['image_url']?.toString() ?? '',
     );
   }
 }
@@ -297,7 +324,7 @@ class TaskRemark {
       id: json['id'],
       taskProgressId: json['task_progress_id'],
       userId: json['user_id'],
-      remark: json['remark'],
+      remark: json['remark']?.toString() ?? '',
       createdAt: json['created_at'],
       updatedAt: json['updated_at'],
     );
@@ -327,11 +354,11 @@ class TaskProgressAttachment {
     return TaskProgressAttachment(
       id: json['id'],
       taskProgressId: json['task_progress_id'],
-      file: json['file'],
+      file: json['file']?.toString() ?? '',
       createdAt: json['created_at'],
       updatedAt: json['updated_at'],
       deletedAt: json['deleted_at'],
-      fileUrl: json['file_url'],
+      fileUrl: json['file_url']?.toString() ?? '',
     );
   }
 }

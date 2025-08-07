@@ -24,8 +24,11 @@ import '../../models/site.dart';
 import '../auth/signup_screen.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../profile_screen.dart';
+import '../notifications_screen.dart';
+import '../admin/auto_checkout_logs_screen.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'dart:io';
+import '../../services/auto_checkout_service.dart';
 
 class _SiteSelectionDialog extends StatefulWidget {
   final List<Site> sites;
@@ -38,6 +41,17 @@ class _SiteSelectionDialog extends StatefulWidget {
 
   @override
   State<_SiteSelectionDialog> createState() => _SiteSelectionDialogState();
+}
+
+class _SiteSelectionDialogForExempted extends StatefulWidget {
+  final List<Site> sites;
+
+  const _SiteSelectionDialogForExempted({
+    required this.sites,
+  });
+
+  @override
+  State<_SiteSelectionDialogForExempted> createState() => _SiteSelectionDialogForExemptedState();
 }
 
 class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
@@ -226,6 +240,149 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
   }
 }
 
+class _SiteSelectionDialogForExemptedState extends State<_SiteSelectionDialogForExempted> {
+  final TextEditingController _searchController = TextEditingController();
+  List<Site> _filteredSites = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _filteredSites = widget.sites;
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged() {
+    final query = _searchController.text.toLowerCase();
+    setState(() {
+      if (query.isEmpty) {
+        _filteredSites = widget.sites;
+      } else {
+        _filteredSites = widget.sites.where((site) {
+          return site.name.toLowerCase().contains(query) ||
+                 site.company.toLowerCase().contains(query) ||
+                 site.address.toLowerCase().contains(query) ||
+                 site.status.toLowerCase().contains(query);
+        }).toList();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      backgroundColor: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Select Site',
+              style: AppTypography.titleMedium.copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Search Field
+            TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search sites...',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                        },
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Sites List
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.5,
+              ),
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: _filteredSites.length,
+                itemBuilder: (context, index) {
+                  final site = _filteredSites[index];
+                  
+                  return Column(
+                    children: [
+                      ListTile(
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.location_on,
+                            color: AppColors.primary,
+                            size: 24,
+                          ),
+                        ),
+                        title: Text(
+                          site.name,
+                          style: AppTypography.titleSmall.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              site.address,
+                              style: AppTypography.bodySmall.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Can check in',
+                              style: AppTypography.bodySmall.copyWith(
+                                color: Colors.green,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                        onTap: () => Navigator.of(context).pop(site),
+                      ),
+                      if (index < _filteredSites.length - 1) const Divider(),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -252,10 +409,14 @@ class _HomeScreenState extends State<HomeScreen> {
     _autoAttendanceCheck();
     _loadAssignedSites();
 
+    // Check if auto checkout monitoring should be active based on current attendance status
+    _checkAutoCheckoutStatus();
   }
 
   @override
   void dispose() {
+    // Stop auto checkout monitoring when leaving the screen
+    AutoCheckoutService.instance.stopMonitoring();
     super.dispose();
   }
 
@@ -289,6 +450,18 @@ class _HomeScreenState extends State<HomeScreen> {
       SnackBarUtils.showError(context, "$e");
     }
   }
+
+  // Check if auto checkout monitoring should be active based on current attendance status
+  Future<void> _checkAutoCheckoutStatus() async {
+    // If user is currently checked in (has check-in time but no check-out time)
+    if (_attendanceFlag == 'check_out' && _checkInTime != null && _checkOutTime == null) {
+      // User is checked in, we should start monitoring if we have the site info
+      // This would require storing the check-in site info, which we can implement later
+      // For now, we'll just log that monitoring should be active
+      log('User is checked in, auto checkout monitoring should be active');
+    }
+  }
+
 
   Future<void> _loadAssignedSites() async {
     if (_isLoadingSites) return;
@@ -332,9 +505,43 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     try {
+      // First check if location services are enabled
+      final isLocationEnabled = await LocationService.isLocationServiceEnabled();
+      if (!isLocationEnabled) {
+        throw Exception('Location services are disabled. Please enable GPS in settings.');
+      }
+
+      // Check permission
+      final permission = await LocationService.getLocationPermission();
+      if (permission == LocationPermission.denied) {
+        throw Exception('Location permission denied. Please grant location permission in settings.');
+      } else if (permission == LocationPermission.deniedForever) {
+        throw Exception('Location permission is permanently denied. Please enable it in device settings.');
+      }
+
+      // Get current position
       _currentPosition = await LocationService.getCurrentPosition();
+      
+      // Validate the position
+      if (_currentPosition == null || 
+          _currentPosition!.latitude == 0.0 && _currentPosition!.longitude == 0.0) {
+        throw Exception('Invalid location received. Please check your GPS signal and try again.');
+      }
+      
     } catch (e) {
-      throw Exception('Failed to get location. Please try again.');
+      log('Location error in attendance marking: $e');
+      // Re-throw with proper error message
+      if (e.toString().contains('permission')) {
+        throw Exception('Location permission denied. Please grant location permission in settings.');
+      } else if (e.toString().contains('timeout')) {
+        throw Exception('Location request timed out. Please check your GPS signal and try again.');
+      } else if (e.toString().contains('disabled')) {
+        throw Exception('Location services are disabled. Please enable GPS in settings.');
+      } else if (e.toString().contains('network')) {
+        throw Exception('Network error while getting location. Please check your internet connection.');
+      } else {
+        throw Exception('Failed to get location. Please check your GPS signal and try again.');
+      }
     }
   }
 
@@ -362,11 +569,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final user = userProvider.user;
     if (user == null) return;
 
-    try {
-      // Ensure we have location permission and current location
-      await _ensureLocationPermission();
-      await _getCurrentLocation();
+    log("user = ${user.data.isCheckInExmpted}");
 
+    try {
       // For punch-in, show site selection with distance check
       Site? selectedSite;
       if (type == 'check_in') {
@@ -378,19 +583,40 @@ class _HomeScreenState extends State<HomeScreen> {
           }
         }
 
-        // Show site selection dialog with distance check
-        selectedSite = await showDialog<Site>(
-          context: context,
-          builder: (context) => _SiteSelectionDialog(
-            sites: _assignedSites,
-            currentPosition: _currentPosition!,
-          ),
-        );
+        // Check if user is exempted from location checking
+        bool isExempted = user.data.isCheckInExmpted == 1;
+        
+        if (isExempted) {
+          // For exempted users, show dialog without location checking
+          selectedSite = await showDialog<Site>(
+            context: context,
+            builder: (context) => _SiteSelectionDialogForExempted(
+              sites: _assignedSites,
+            ),
+          );
+        } else {
+          // For non-exempted users, ensure location permission and current location
+          await _ensureLocationPermission();
+          await _getCurrentLocation();
+
+          // Show site selection dialog with distance check
+          selectedSite = await showDialog<Site>(
+            context: context,
+            builder: (context) => _SiteSelectionDialog(
+              sites: _assignedSites,
+              currentPosition: _currentPosition!,
+            ),
+          );
+        }
 
         if (selectedSite == null) {
           setState(() => _isMarkingAttendance = false);
           return;
         }
+      } else {
+        // For check-out, ensure location permission and current location
+        await _ensureLocationPermission();
+        await _getCurrentLocation();
       }
 
       // Pick image
@@ -444,20 +670,49 @@ class _HomeScreenState extends State<HomeScreen> {
       }
       }
 
-      // Get address with retry functionality
-      String address = await _getAddressWithRetry();
+      // Get address and location data based on exemption status
+      String address = 'Address not available';
+      String latitude = '0';
+      String longitude = '0';
+      
+      bool isExempted = user.data.isCheckInExmpted == 1;
+      
+      if (!isExempted || type == 'check_out') {
+        // For non-exempted users or check-out, get location and address
+        address = await _getAddressWithRetry();
+        if (_currentPosition != null) {
+          latitude = _currentPosition!.latitude.toString();
+          longitude = _currentPosition!.longitude.toString();
+        }
+      }
 
       // Call API
       await ApiService().saveAttendance(
         context: context,
         apiToken: user.data.apiToken,
         type: type,
-        latitude: _currentPosition!.latitude.toString(),
-        longitude: _currentPosition!.longitude.toString(),
+        latitude: latitude,
+        longitude: longitude,
         address: address,
         imagePath: compressedPath,
         siteId: type == 'check_in' && selectedSite != null ? selectedSite.id : null,
       );
+
+      // Handle auto checkout monitoring (only after successful API call)
+      if (type == 'check_in' && selectedSite != null) {
+        // Start auto checkout monitoring for check-in (delayed to avoid interference)
+        final site = selectedSite; // Capture the non-null value
+        Future.delayed(const Duration(seconds: 3), () {
+          if (mounted) {
+            AutoCheckoutService.instance.startMonitoring(context, site);
+            SnackBarUtils.showInfo(context, 'Auto checkout enabled. You will be automatically checked out if you move outside the site range.');
+          }
+        });
+      } else if (type == 'check_out') {
+        // Stop auto checkout monitoring for check-out
+        AutoCheckoutService.instance.stopMonitoring();
+        SnackBarUtils.showInfo(context, 'Auto checkout monitoring stopped.');
+      }
 
       SnackBarUtils.showSuccess(context, 'Attendance marked successfully');
       await _autoAttendanceCheck(); // Refresh flag and button state
@@ -519,7 +774,7 @@ class _HomeScreenState extends State<HomeScreen> {
     switch (errorType) {
       case LocationErrorType.permissionDenied:
         title = 'Location Permission Required';
-        message = 'Location permission is required for attendance. Would you like to grant permission?';
+        message = 'Location permission is required for attendance. Please grant permission to continue.';
         primaryButtonText = 'Grant Permission';
         break;
       case LocationErrorType.permissionDeniedForever:
@@ -530,15 +785,24 @@ class _HomeScreenState extends State<HomeScreen> {
         break;
       case LocationErrorType.locationServiceDisabled:
         title = 'Location Services Disabled';
-        message = 'Location services are disabled. Please enable location services in your device settings and try again.';
+        message = 'GPS is disabled. Please enable location services in your device settings and try again.';
         primaryButtonText = 'Check & Retry';
         secondaryButtonText = 'Continue without location';
         break;
       case LocationErrorType.timeout:
+        title = 'Location Timeout';
+        message = 'Location request timed out. Please check your GPS signal and try again.';
+        primaryButtonText = 'Retry';
+        break;
       case LocationErrorType.networkError:
+        title = 'Network Error';
+        message = 'Network error while getting location. Please check your internet connection and try again.';
+        primaryButtonText = 'Retry';
+        break;
       case LocationErrorType.unknown:
         title = 'Location Error';
-        message = '$errorMessage\n\nWould you like to try again?';
+        message = 'Failed to get location. Please check your GPS and try again.';
+        primaryButtonText = 'Retry';
         break;
     }
 
@@ -689,6 +953,7 @@ class _HomeScreenState extends State<HomeScreen> {
           key: _scaffoldKey,
           backgroundColor: const Color(0xFFF8F9FA),
           appBar: CustomAppBar(
+            key: customAppBarKey,
             onMenuPressed: () {
               _scaffoldKey.currentState?.openDrawer();
             },
@@ -751,6 +1016,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           NavigationUtils.push(context, const ProfileScreen());
                         },
                       ),
+
                       ListTile(
                         leading: const Icon(Icons.lock_outline),
                         title: const Text('Change Password'),
@@ -766,6 +1032,15 @@ class _HomeScreenState extends State<HomeScreen> {
                           NavigationUtils.pop(context);
                         },
                       ),
+                      // if(userProvider.user!.data.id == 1 || userProvider.user!.data.id == 9) ListTile(
+                      //   leading: const Icon(Icons.analytics_outlined),
+                      //   title: const Text('Auto Checkout Logs'),
+                      //   onTap: () {
+                      //     NavigationUtils.pop(context);
+                      //     NavigationUtils.push(context, const AutoCheckoutLogsScreen());
+                      //   },
+                      // ),
+
                       ListTile(
                         leading: const Icon(Icons.person_add_outlined),
                         title: const Text('Create User'),
@@ -842,6 +1117,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     onPunchIn: () => _markAttendance('check_in'),
                     onPunchOut: () => _markAttendance('check_out'),
                     isPunchedIn: _attendanceFlag == 'check_out',
+                    isAutoCheckoutEnabled: AutoCheckoutService.instance.isMonitoring,
+                    checkInSite: AutoCheckoutService.instance.checkInSite,
                   ),
                   SizedBox(height: Responsive.responsiveValue(context: context, mobile: 24, tablet: 40)),
                   Text(

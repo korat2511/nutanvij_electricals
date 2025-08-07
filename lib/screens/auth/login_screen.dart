@@ -13,6 +13,8 @@ import '../../widgets/custom_text_field.dart';
 import '../home/home_screen.dart';
 import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
+import '../notification_permission_screen.dart';
+import '../../services/notification_permission_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -54,9 +56,38 @@ class _LoginScreenState extends State<LoginScreen> {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       await userProvider.setUser(user, context);
 
-      // Show success message and navigate to home
+      // Show success message
       SnackBarUtils.showSuccess(context, 'Login successful');
-      NavigationUtils.pushAndRemoveUntil(context, HomeScreen());
+      
+      // Check notification permission
+      bool hasPermission = await NotificationPermissionService.isNotificationPermissionGranted();
+      
+      if (!mounted) return;
+      
+      if (!hasPermission) {
+        // Show notification permission screen
+        NavigationUtils.pushAndRemoveUntil(
+          context,
+          NotificationPermissionScreen(
+            onPermissionGranted: () {
+              print('DEBUG: Login screen - onPermissionGranted called');
+              if (mounted) {
+                print('DEBUG: Login screen - navigating to HomeScreen');
+                NavigationUtils.pushAndRemoveUntil(context, const HomeScreen());
+              }
+            },
+            onPermissionDenied: () {
+              print('DEBUG: Login screen - onPermissionDenied called');
+              if (mounted) {
+                print('DEBUG: Login screen - navigating to HomeScreen');
+                NavigationUtils.pushAndRemoveUntil(context, const HomeScreen());
+              }
+            },
+          ),
+        );
+      } else {
+      NavigationUtils.pushAndRemoveUntil(context, const HomeScreen());
+      }
     } on ApiException catch (e) {
       if (!mounted) return;
       SnackBarUtils.showError(context, e.message);
@@ -209,7 +240,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     alignment: Alignment.centerRight,
                     child: TextButton(
                       onPressed: () {
-                        NavigationUtils.push(context, ForgotPasswordScreen());
+                        NavigationUtils.push(context, const ForgotPasswordScreen());
                       },
                       child: Text(
                         'Forgot Password?',

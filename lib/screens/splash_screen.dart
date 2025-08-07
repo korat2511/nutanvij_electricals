@@ -9,6 +9,9 @@ import 'auth/login_screen.dart';
 import 'home/home_screen.dart';
 import '../core/utils/responsive.dart';
 import '../core/utils/navigation_utils.dart';
+import '../services/notification_permission_service.dart';
+import '../services/auto_checkout_service.dart';
+import 'notification_permission_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -64,10 +67,44 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
     if (!mounted) return;
 
-    // Check if user exists and redirect accordingly
-    if (userProvider.user != null) {
-      log(userProvider.user!.token);
-      NavigationUtils.pushReplacement(context, const HomeScreen());
+          // Check if user exists and redirect accordingly
+      if (userProvider.user != null) {
+        log(userProvider.user!.token);
+        
+        // Check for auto checkout on app start
+        await AutoCheckoutService.instance.checkForAutoCheckoutOnAppStart(context);
+        
+        if (!mounted) return;
+        
+        // Check notification permission
+        bool hasPermission = await NotificationPermissionService.isNotificationPermissionGranted();
+        
+        if (!mounted) return;
+        
+        if (!hasPermission) {
+          // Show notification permission screen
+          NavigationUtils.pushReplacement(
+            context,
+            NotificationPermissionScreen(
+              onPermissionGranted: () {
+                print('DEBUG: Splash screen - onPermissionGranted called');
+                if (mounted) {
+                  print('DEBUG: Splash screen - navigating to HomeScreen');
+                  NavigationUtils.pushReplacement(context, const HomeScreen());
+                }
+              },
+              onPermissionDenied: () {
+                print('DEBUG: Splash screen - onPermissionDenied called');
+                if (mounted) {
+                  print('DEBUG: Splash screen - navigating to HomeScreen');
+                  NavigationUtils.pushReplacement(context, const HomeScreen());
+                }
+              },
+            ),
+          );
+        } else {
+        NavigationUtils.pushReplacement(context, const HomeScreen());
+      }
     } else {
       NavigationUtils.pushReplacement(context, const LoginScreen());
     }

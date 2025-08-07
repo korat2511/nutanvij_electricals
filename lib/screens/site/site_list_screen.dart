@@ -30,8 +30,14 @@ class _SiteListScreenState extends State<SiteListScreen> {
   List<Site> _sites = [];
   List<Site> _filteredSites = [];
   bool _isLoading = true;
+  bool _isLoadingMore = false;
   String? _error;
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  
+  // Pagination variables
+  int _currentPage = 1;
+  bool _hasMoreData = true;
 
   Future<void> _loadSites() async {
     setState(() {
@@ -44,10 +50,13 @@ class _SiteListScreenState extends State<SiteListScreen> {
       final sites = await ApiService().getSiteList(
         context: context,
         apiToken: userProvider.user?.data.apiToken ?? '',
+        page: 1,
       );
       setState(() {
         _sites = sites; // Show sites immediately
         _filteredSites = sites; // Initialize filtered sites
+        _currentPage = 1;
+        _hasMoreData = sites.isNotEmpty;
         _isLoading = false;
       });
 
@@ -80,17 +89,70 @@ class _SiteListScreenState extends State<SiteListScreen> {
     }
   }
 
+  Future<void> _loadMoreSites() async {
+    if (_isLoadingMore || !_hasMoreData) return;
+
+    setState(() {
+      _isLoadingMore = true;
+    });
+
+    try {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final sites = await ApiService().getSiteList(
+        context: context,
+        apiToken: userProvider.user?.data.apiToken ?? '',
+        page: _currentPage + 1,
+      );
+
+      // Fetch users for new sites in parallel
+      final futures = sites.map((site) async {
+        final siteWithUsers = await ApiService().getUserBySite(
+          context: context,
+          apiToken: userProvider.user?.data.apiToken ?? '',
+          siteId: site.id,
+        );
+        return site.copyWith(users: siteWithUsers.users);
+      }).toList();
+
+      final sitesWithUsers = await Future.wait(futures);
+
+      setState(() {
+        _sites.addAll(sitesWithUsers);
+        _filteredSites.addAll(sitesWithUsers);
+        _currentPage++;
+        _hasMoreData = sites.isNotEmpty;
+        _isLoadingMore = false;
+      });
+    } catch (e) {
+      print('Error loading more sites: $e');
+      setState(() {
+        _isLoadingMore = false;
+      });
+      SnackBarUtils.showError(context, e.toString());
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _loadSites();
     _searchController.addListener(_onSearchChanged);
+    _scrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      if (!_isLoadingMore && _hasMoreData) {
+        _loadMoreSites();
+      }
+    }
   }
 
   void _onSearchChanged() {
@@ -161,6 +223,7 @@ class _SiteListScreenState extends State<SiteListScreen> {
                           final isTablet = Responsive.responsiveValue(context: context, mobile: 1, tablet: 2).toInt() > 1;
                           if (isTablet) {
                             return GridView.builder(
+                              controller: _scrollController,
                               padding: EdgeInsets.all(Responsive.responsiveValue(context: context, mobile: 12, tablet: 32)),
                               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                                 crossAxisCount: Responsive.responsiveValue(context: context, mobile: 1, tablet: 2).toInt(),
@@ -168,8 +231,34 @@ class _SiteListScreenState extends State<SiteListScreen> {
                                 crossAxisSpacing: 16,
                                 mainAxisSpacing: 16,
                               ),
-                              itemCount: _filteredSites.length,
+                              itemCount: _filteredSites.length + (_isLoadingMore ? 1 : 0) + (!_hasMoreData && _filteredSites.isNotEmpty ? 1 : 0),
                               itemBuilder: (context, index) {
+                                // Handle loading indicator
+                                if (_isLoadingMore && index == _filteredSites.length) {
+                                  return const Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.all(16.0),
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  );
+                                }
+                                
+                                // Handle end message
+                                if (!_hasMoreData && _filteredSites.isNotEmpty && index == _filteredSites.length) {
+                                  return const Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.all(16.0),
+                                      child: Text(
+                                        'No more sites to load',
+                                        style: TextStyle(
+                                          color: Colors.grey,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }
+                                
                                 final site = _filteredSites[index];
                                 return _SiteCard(
                                   site: site,
@@ -191,9 +280,36 @@ class _SiteListScreenState extends State<SiteListScreen> {
                             );
                           } else {
                             return ListView.builder(
+                              controller: _scrollController,
                               padding: const EdgeInsets.symmetric(horizontal: 12),
-                              itemCount: _filteredSites.length,
+                              itemCount: _filteredSites.length + (_isLoadingMore ? 1 : 0) + (!_hasMoreData && _filteredSites.isNotEmpty ? 1 : 0),
                               itemBuilder: (context, index) {
+                                // Handle loading indicator
+                                if (_isLoadingMore && index == _filteredSites.length) {
+                                  return const Padding(
+                                    padding: EdgeInsets.all(16.0),
+                                    child: Center(
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  );
+                                }
+                                
+                                // Handle end message
+                                if (!_hasMoreData && _filteredSites.isNotEmpty && index == _filteredSites.length) {
+                                  return const Padding(
+                                    padding: EdgeInsets.all(16.0),
+                                    child: Center(
+                                      child: Text(
+                                        'No more sites to load',
+                                        style: TextStyle(
+                                          color: Colors.grey,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }
+                                
                                 final site = _filteredSites[index];
                                 return _SiteCard(
                                   site: site,

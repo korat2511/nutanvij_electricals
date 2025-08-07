@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:developer';
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:http/http.dart' as http;
 import '../models/designation.dart';
 import '../models/department.dart';
@@ -12,6 +14,7 @@ import '../providers/user_provider.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
 import '../models/task.dart' hide Tag;
+import '../models/payment_data.dart';
 import 'package:file_picker/file_picker.dart';
 import '../models/tag.dart';
 
@@ -139,6 +142,32 @@ class ApiService {
   }
 
   Future<UserModel> login(String mobile, String password) async {
+
+    // Get device ID
+    final deviceInfo = DeviceInfoPlugin();
+    String deviceId = '';
+    if (Platform.isAndroid) {
+      final androidInfo = await deviceInfo.androidInfo;
+      deviceId = androidInfo.id;
+    } else if (Platform.isIOS) {
+      final iosInfo = await deviceInfo.iosInfo;
+      deviceId = iosInfo.identifierForVendor ?? '';
+    }
+
+    // Get FCM token
+    String? fcmToken;
+    if (Platform.isIOS) {
+      String? apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+
+      log("apnsToken == $apnsToken");
+      if (apnsToken != null) {
+        fcmToken = await FirebaseMessaging.instance.getToken();
+      }
+    } else {
+      fcmToken = await FirebaseMessaging.instance.getToken();
+    }
+
+
     return _handleNetworkCall(() async {
       if (mobile.isEmpty) {
         throw ApiException('Mobile number is required', statusCode: 400);
@@ -152,6 +181,8 @@ class ApiService {
         body: {
           'mobile': mobile,
           'password': password,
+          'fcm_token': fcmToken,
+          'device_id': deviceId,
         },
       );
 
@@ -722,11 +753,15 @@ class ApiService {
   Future<List<Site>> getSiteList({
     required BuildContext context,
     required String apiToken,
+    int page = 1,
   }) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/getMySite'),
-        body: {'api_token': apiToken},
+        body: {
+          'api_token': apiToken,
+          'page': page.toString(),
+        },
       );
       final data = json.decode(response.body);
 
@@ -1060,6 +1095,9 @@ class ApiService {
     String? search,
   }) async {
     return _handleNetworkCall(() async {
+
+      log("status = $status");
+
       final response = await http.post(
         Uri.parse('$baseUrl/getTask'),
         body: {
@@ -1083,6 +1121,8 @@ class ApiService {
     required String apiToken,
     required int taskId,
   }) async {
+    log("Task ID == $taskId");
+    log("Task ID == $apiToken");
     return _handleNetworkCall(() async {
       final response = await http.post(
         Uri.parse('$baseUrl/getTaskDetail'),
@@ -1217,6 +1257,7 @@ class ApiService {
       request.fields['remark'] = remark;
     }
 
+
     if (images != null) {
       for (var imageFile in images) {
         var file = await http.MultipartFile.fromPath("images[]", imageFile.path);
@@ -1233,8 +1274,89 @@ class ApiService {
 
     final streamedResponse = await request.send();
     final response = await http.Response.fromStream(streamedResponse);
+
     final data = _handleResponse(response, null);
     return data;
+  }
+
+  Future<dynamic> approveTaskProgress({
+    required String apiToken,
+    required int progressId,
+    required String action, // 'approve' or 'reject'
+    String? remark,
+  }) async {
+    return _handleNetworkCall(() async {
+      final response = await http.post(
+        Uri.parse('$baseUrl/approveTaskProgress'),
+        body: {
+          'api_token': apiToken,
+          'task_progress_id': progressId.toString(),
+          'action': action,
+          if (remark != null && remark.isNotEmpty) 'remark': remark,
+        },
+      );
+      return _handleResponse(response, null);
+    });
+  }
+
+  Future<dynamic> editTaskProgress({
+    required String apiToken,
+    required int progressId,
+    required String workDone,
+    String? remark,
+    List<File>? images,
+    List<File>? attachments,
+  }) async {
+    return _handleNetworkCall(() async {
+      var request = http.MultipartRequest('POST', Uri.parse('$baseUrl/editProgress'));
+      
+      request.fields['api_token'] = apiToken;
+      request.fields['task_progress_id'] = progressId.toString();
+      request.fields['work_done'] = workDone;
+      if (remark != null && remark.isNotEmpty) {
+        request.fields['remark'] = remark;
+      }
+
+      if (images != null) {
+        for (var imageFile in images) {
+          var file = await http.MultipartFile.fromPath("images[]", imageFile.path);
+          request.files.add(file);
+        }
+      }
+
+      if (attachments != null) {
+        for (var attachmentFile in attachments) {
+          var file = await http.MultipartFile.fromPath("attachments[]", attachmentFile.path);
+          request.files.add(file);
+        }
+      }
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      return _handleResponse(response, null);
+    });
+  }
+
+  Future<List<PaymentData>> getPaymentData({
+    required BuildContext context,
+    required String apiToken,
+    required int month,
+    required int year,
+  }) async {
+    return _handleNetworkCall(() async {
+      final response = await http.post(
+        Uri.parse('$baseUrl/mySalaryList'),
+        body: {
+          'api_token': apiToken,
+          'month': month.toString(),
+          'year': year.toString(),
+        },
+      );
+      final data = _handleResponse(response, context);
+      final List<dynamic> paymentJson = data['data'] ?? [];
+      return paymentJson.map((json) => PaymentData.fromJson(json)).toList();
+    });
   }
 
   Future<Map<String, dynamic>> forgotPassword(String email) async {
@@ -1264,6 +1386,58 @@ class ApiService {
         },
       );
       return _handleResponse(response, null);
+    });
+  }
+
+  Future<Map<String, dynamic>> getProfile({
+    required BuildContext context,
+    required String apiToken,
+    required String userId,
+  }) async {
+    return _handleNetworkCall(() async {
+      final response = await http.post(
+        Uri.parse('$baseUrl/getProfile'),
+        body: {
+          'api_token': apiToken,
+          'user_id': userId,
+        },
+      );
+      return _handleResponse(response, context);
+    });
+  }
+
+  Future<Map<String, dynamic>> editProfile({
+    required BuildContext context,
+    required String apiToken,
+    required int userId,
+    required String name,
+    required String email,
+    required String mobile,
+    required String dob,
+    required String bankName,
+    required String bankAccountNo,
+    required String ifscCode,
+    required String panCardNo,
+    required String aadharCardNo,
+  }) async {
+    return _handleNetworkCall(() async {
+      final response = await http.post(
+        Uri.parse('$baseUrl/editProfile'),
+        body: {
+          'api_token': apiToken,
+          'user_id': userId.toString(),
+          'name': name,
+          'email': email,
+          'mobile': mobile,
+          'dob': dob,
+          'bank_name': bankName,
+          'bank_account_no': bankAccountNo,
+          'ifsc_code': ifscCode,
+          'pan_card_no': panCardNo,
+          'aadhar_card_no': aadharCardNo,
+        },
+      );
+      return _handleResponse(response, context);
     });
   }
 

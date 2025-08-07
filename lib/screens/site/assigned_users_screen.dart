@@ -10,6 +10,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/utils/snackbar_utils.dart';
 import 'assign_users_screen.dart';
 import '../../models/designation.dart';
+import '../../models/task.dart';
 
 class AssignedUsersScreen extends StatefulWidget {
   final int siteId;
@@ -303,6 +304,12 @@ class _AssignedUsersScreenState extends State<AssignedUsersScreen> {
                               name: user.name,
                               imageUrl: user.imagePath,
                               punchStatusIcon: punchStatusIcon,
+                              user: AssignUser(
+                                id: user.id,
+                                name: user.name,
+                                imagePath: user.imagePath,
+                              ),
+
                               actionButton: IconButton(
                                 icon: const Icon(Icons.remove_circle, color: Colors.red),
                                 onPressed: () => _handleRemoveUser(user),

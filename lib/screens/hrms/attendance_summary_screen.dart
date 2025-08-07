@@ -626,20 +626,23 @@ class _AttendanceSummaryScreenState extends State<AttendanceSummaryScreen>
                         } else if (shouldColor && isWorkingDay && !_presentDays.contains(dayNum)) {
                           bg = Colors.red.shade200;
                         }
-                        return Container(
-                          width: cellSize,
-                          height: cellSize,
-                          margin: EdgeInsets.symmetric(vertical: Responsive.responsiveValue(context: context, mobile: 2, tablet: 4)),
-                          decoration: BoxDecoration(
-                            color: bg,
-                            borderRadius: BorderRadius.circular(cellRadius),
-                          ),
-                          child: Center(
-                            child: Text(
-                              dayNum.toString(),
-                              style: AppTypography.bodyMedium.copyWith(
-                                color: Colors.black,
-                                fontSize: Responsive.responsiveValue(context: context, mobile: 14, tablet: 20),
+                        return GestureDetector(
+                          onTap: () => _showAttendanceDetails(date),
+                          child: Container(
+                            width: cellSize,
+                            height: cellSize,
+                            margin: EdgeInsets.symmetric(vertical: Responsive.responsiveValue(context: context, mobile: 2, tablet: 4)),
+                            decoration: BoxDecoration(
+                              color: bg,
+                              borderRadius: BorderRadius.circular(cellRadius),
+                            ),
+                            child: Center(
+                              child: Text(
+                                dayNum.toString(),
+                                style: AppTypography.bodyMedium.copyWith(
+                                  color: Colors.black,
+                                  fontSize: Responsive.responsiveValue(context: context, mobile: 14, tablet: 20),
+                                ),
                               ),
                             ),
                           ),
@@ -738,6 +741,28 @@ class _AttendanceSummaryScreenState extends State<AttendanceSummaryScreen>
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  void _showAttendanceDetails(DateTime selectedDate) {
+    // Find attendance records for the selected date
+    final dateStr = DateFormat('yyyy-MM-dd').format(selectedDate);
+    final dayRecords = _attendanceRecords.where((rec) => rec['date'] == dateStr).toList();
+    
+    if (dayRecords.isEmpty) {
+      SnackBarUtils.showInfo(context, 'No attendance records for ${DateFormat('MMMM dd, yyyy').format(selectedDate)}');
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _AttendanceDetailsModal(
+        date: selectedDate,
+        records: dayRecords,
+        userName: 'Your Attendance',
       ),
     );
   }
@@ -955,5 +980,362 @@ class _AttendanceSummaryScreenState extends State<AttendanceSummaryScreen>
     final now = DateTime.now();
     final datePart = DateFormat('yyyy-MM-dd').format(now);
     return '$datePart $timeStr';
+  }
+}
+
+class _AttendanceDetailsModal extends StatelessWidget {
+  final DateTime date;
+  final List<Map<String, dynamic>> records;
+  final String userName;
+
+  const _AttendanceDetailsModal({
+    required this.date,
+    required this.records,
+    required this.userName,
+  });
+
+  String formatTime(String? dateTimeStr) {
+    if (dateTimeStr == null || dateTimeStr == "0000-00-00 00:00:00") return "--:--:--";
+    try {
+      final dateTime = DateTime.parse(dateTimeStr);
+      return DateFormat('HH:mm:ss').format(dateTime);
+    } catch (e) {
+      if (dateTimeStr.length >= 19) {
+        return dateTimeStr.substring(11, 19);
+      }
+      return "--:--:--";
+    }
+  }
+
+  String formatDate(String? dateTimeStr) {
+    if (dateTimeStr == null || dateTimeStr == "0000-00-00 00:00:00") return "";
+    try {
+      final dateTime = DateTime.parse(dateTimeStr);
+      return DateFormat('dd MMM yyyy').format(dateTime);
+    } catch (e) {
+      return "";
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.8,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          // Handle bar
+          Container(
+            margin: const EdgeInsets.only(top: 8),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          // Header
+          Padding(
+            padding: EdgeInsets.all(Responsive.responsiveValue(context: context, mobile: 16, tablet: 24)),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        userName,
+                        style: AppTypography.titleLarge.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      Text(
+                        DateFormat('EEEE, MMMM dd, yyyy').format(date),
+                        style: AppTypography.bodyMedium.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close),
+                  color: AppColors.textSecondary,
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          // Content
+          Expanded(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.all(Responsive.responsiveValue(context: context, mobile: 16, tablet: 24)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Attendance Details',
+                    style: AppTypography.titleMedium.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: Responsive.responsiveValue(context: context, mobile: 16, tablet: 24)),
+                  ...records.map((record) => _buildAttendanceRecord(context, record)).toList(),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAttendanceRecord(BuildContext context, Map<String, dynamic> record) {
+    final hasCheckIn = record['in_time'] != null;
+    final hasCheckOut = record['out_time'] != null;
+    
+    return Container(
+      margin: EdgeInsets.only(bottom: Responsive.responsiveValue(context: context, mobile: 16, tablet: 24)),
+      padding: EdgeInsets.all(Responsive.responsiveValue(context: context, mobile: 16, tablet: 20)),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(Responsive.responsiveValue(context: context, mobile: 12, tablet: 16)),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (hasCheckIn) ...[
+            _buildAttendanceEntry(
+              context: context,
+              type: 'Check In',
+              time: record['in_time'],
+              address: record['check_in_address'] ?? record['address'] ?? 'Not available',
+              latitude: record['check_in_latitude'] ?? record['latitude'] ?? 'Not available',
+              longitude: record['check_in_longitude'] ?? record['longitude'] ?? 'Not available',
+              icon: 'assets/svg/punchin.svg',
+              color: AppColors.primary,
+              record: record,
+            ),
+            if (hasCheckOut) 
+              SizedBox(height: Responsive.responsiveValue(context: context, mobile: 16, tablet: 24)),
+          ],
+          if (hasCheckOut) ...[
+            _buildAttendanceEntry(
+              context: context,
+              type: 'Check Out',
+              time: record['out_time'],
+              address: record['check_out_address'] ?? record['address'] ?? 'Not available',
+              latitude: record['check_out_latitude'] ?? record['latitude'] ?? 'Not available',
+              longitude: record['check_out_longitude'] ?? record['longitude'] ?? 'Not available',
+              icon: 'assets/svg/punchout.svg',
+              color: AppColors.punchOut,
+              record: record,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAttendanceEntry({
+    required BuildContext context,
+    required String type,
+    required String? time,
+    required String address,
+    required String latitude,
+    required String longitude,
+    required String icon,
+    required Color color,
+    required Map<String, dynamic> record,
+  }) {
+    final imageField = type == 'Check In' ? 'image_in' : 'image_out';
+    final imageUrl = record[imageField] ?? record['image'] ?? record['selfie'];
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(Responsive.responsiveValue(context: context, mobile: 8, tablet: 12)),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(Responsive.responsiveValue(context: context, mobile: 8, tablet: 12)),
+              ),
+              child: SvgPicture.asset(
+                icon,
+                width: Responsive.responsiveValue(context: context, mobile: 16, tablet: 24),
+                height: Responsive.responsiveValue(context: context, mobile: 16, tablet: 24),
+                color: color,
+              ),
+            ),
+            SizedBox(width: Responsive.responsiveValue(context: context, mobile: 12, tablet: 16)),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    type,
+                    style: AppTypography.titleMedium.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: color,
+                    ),
+                  ),
+                  Text(
+                    formatTime(time),
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: Responsive.responsiveValue(context: context, mobile: 12, tablet: 16)),
+        _buildInfoRow(context, 'Address', address, Icons.location_on),
+        SizedBox(height: Responsive.responsiveValue(context: context, mobile: 8, tablet: 12)),
+        Row(
+          children: [
+            Expanded(
+              child: _buildInfoRow(context, 'Latitude', latitude, Icons.gps_fixed),
+            ),
+            SizedBox(width: Responsive.responsiveValue(context: context, mobile: 12, tablet: 16)),
+            Expanded(
+              child: _buildInfoRow(context, 'Longitude', longitude, Icons.gps_fixed),
+            ),
+          ],
+        ),
+        if (imageUrl != null && imageUrl.toString().isNotEmpty) ...[
+          SizedBox(height: Responsive.responsiveValue(context: context, mobile: 12, tablet: 16)),
+          _buildViewImageButton(context, imageUrl.toString(), type, color),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildViewImageButton(BuildContext context, String imageUrl, String type, Color color) {
+    return GestureDetector(
+      onTap: () => _showImage(context, imageUrl, type),
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: Responsive.responsiveValue(context: context, mobile: 12, tablet: 16),
+          vertical: Responsive.responsiveValue(context: context, mobile: 8, tablet: 12),
+        ),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(Responsive.responsiveValue(context: context, mobile: 8, tablet: 12)),
+          border: Border.all(color: color.withOpacity(0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.photo_camera,
+              color: color,
+              size: Responsive.responsiveValue(context: context, mobile: 16, tablet: 20),
+            ),
+            SizedBox(width: Responsive.responsiveValue(context: context, mobile: 8, tablet: 12)),
+            Text(
+              'View $type Image',
+              style: AppTypography.bodyMedium.copyWith(
+                color: color,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showImage(BuildContext context, String imageUrl, String type) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          backgroundColor: Colors.black,
+          appBar: AppBar(
+            backgroundColor: Colors.black,
+            foregroundColor: Colors.white,
+            title: Text('$type Image'),
+            elevation: 0,
+          ),
+          body: Center(
+            child: InteractiveViewer(
+              child: Image.network(
+                imageUrl,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) => Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.broken_image, color: Colors.white, size: 80),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Failed to load image',
+                      style: AppTypography.bodyMedium.copyWith(color: Colors.white),
+                    ),
+                  ],
+                ),
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return Center(
+                    child: CircularProgressIndicator(
+                      value: progress.expectedTotalBytes != null
+                          ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
+                          : null,
+                      color: Colors.white,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(BuildContext context, String label, String value, IconData icon) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          icon,
+          size: Responsive.responsiveValue(context: context, mobile: 16, tablet: 20),
+          color: AppColors.textSecondary,
+        ),
+        SizedBox(width: Responsive.responsiveValue(context: context, mobile: 8, tablet: 12)),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: AppTypography.bodySmall.copyWith(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Text(
+                value,
+                style: AppTypography.bodyMedium.copyWith(
+                  color: AppColors.textPrimary,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }
