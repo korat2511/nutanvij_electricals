@@ -49,11 +49,22 @@ class AutoCheckoutLogger {
         },
       };
 
-      await _firestore
-          .collection('auto_checkout_logs')
-          .add(logData);
+      // Log to both general collection and user-specific collection
+      await Future.wait([
+        // General collection for all logs
+        _firestore
+            .collection('auto_checkout_logs')
+            .add(logData),
+        
+        // User-specific collection for easy filtering
+        _firestore
+            .collection('users')
+            .doc(userId)
+            .collection('auto_checkout_logs')
+            .add(logData),
+      ]);
 
-      log('Auto checkout log saved: $action - $note');
+      log('Auto checkout log saved: $action - $note for user: $userName ($userId)');
     } catch (e) {
       log('Error logging auto checkout activity: $e');
     }
@@ -217,36 +228,80 @@ class AutoCheckoutLogger {
     );
   }
 
-  // Get logs for a specific user
+  // Get logs for a specific user (from user-specific collection)
   Future<List<Map<String, dynamic>>> getUserLogs({
     required String userId,
     int limit = 50,
   }) async {
     try {
-      // Get all logs and filter by user in memory to avoid index requirement
       final querySnapshot = await _firestore
+          .collection('users')
+          .doc(userId)
           .collection('auto_checkout_logs')
           .orderBy('timestamp', descending: true)
-          .limit(limit * 2) // Get more logs to filter from
+          .limit(limit)
           .get();
 
-      // Filter user logs in memory
-      final userLogs = querySnapshot.docs
-          .where((doc) {
-            final data = doc.data();
-            return data['userId'] == userId;
-          })
-          .take(limit)
-          .map((doc) {
-            final data = doc.data();
-            data['id'] = doc.id;
-            return data;
-          })
-          .toList();
-
-      return userLogs;
+      return querySnapshot.docs.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id;
+        return data;
+      }).toList();
     } catch (e) {
       log('Error getting user logs: $e');
+      return [];
+    }
+  }
+
+  // Get error logs for a specific user
+  Future<List<Map<String, dynamic>>> getUserErrorLogs({
+    required String userId,
+    int limit = 50,
+  }) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('auto_checkout_logs')
+          .where('isSuccess', isEqualTo: false)
+          .orderBy('timestamp', descending: true)
+          .limit(limit)
+          .get();
+
+      return querySnapshot.docs.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id;
+        return data;
+      }).toList();
+    } catch (e) {
+      log('Error getting user error logs: $e');
+      return [];
+    }
+  }
+
+  // Get logs for a specific user by action type
+  Future<List<Map<String, dynamic>>> getUserLogsByAction({
+    required String userId,
+    required String action,
+    int limit = 50,
+  }) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('auto_checkout_logs')
+          .where('action', isEqualTo: action)
+          .orderBy('timestamp', descending: true)
+          .limit(limit)
+          .get();
+
+      return querySnapshot.docs.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id;
+        return data;
+      }).toList();
+    } catch (e) {
+      log('Error getting user logs by action: $e');
       return [];
     }
   }
@@ -337,6 +392,248 @@ class AutoCheckoutLogger {
     } catch (e) {
       log('Error getting error logs: $e');
       return [];
+    }
+  }
+
+  // Get user statistics and summary
+  Future<Map<String, dynamic>> getUserStatistics({
+    required String userId,
+    int days = 30,
+  }) async {
+    try {
+      final now = DateTime.now();
+      final startDate = now.subtract(Duration(days: days));
+      
+      final querySnapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('auto_checkout_logs')
+          .where('timestamp', isGreaterThan: startDate)
+          .get();
+
+      final logs = querySnapshot.docs.map((doc) => doc.data()).toList();
+      
+      // Calculate statistics
+      int totalLogs = logs.length;
+      int successLogs = logs.where((log) => log['isSuccess'] == true).length;
+      int errorLogs = logs.where((log) => log['isSuccess'] == false).length;
+      
+      // Count by action type
+      Map<String, int> actionCounts = {};
+      for (final log in logs) {
+        final action = log['action'] as String? ?? 'unknown';
+        actionCounts[action] = (actionCounts[action] ?? 0) + 1;
+      }
+      
+      // Get recent errors
+      final recentErrors = logs
+          .where((log) => log['isSuccess'] == false)
+          .take(10)
+          .toList();
+      
+      return {
+        'userId': userId,
+        'period': '$days days',
+        'totalLogs': totalLogs,
+        'successLogs': successLogs,
+        'errorLogs': errorLogs,
+        'successRate': totalLogs > 0 ? (successLogs / totalLogs * 100).roundToDouble() : 0.0,
+        'actionCounts': actionCounts,
+        'recentErrors': recentErrors,
+        'lastUpdated': DateTime.now().toIso8601String(),
+      };
+    } catch (e) {
+      log('Error getting user statistics: $e');
+      return {
+        'userId': userId,
+        'error': e.toString(),
+        'totalLogs': 0,
+        'successLogs': 0,
+        'errorLogs': 0,
+        'successRate': 0.0,
+        'actionCounts': {},
+        'recentErrors': [],
+      };
+    }
+  }
+
+  // Get all users with recent activity
+  Future<List<Map<String, dynamic>>> getActiveUsers({
+    int days = 7,
+  }) async {
+    try {
+      final now = DateTime.now();
+      final startDate = now.subtract(Duration(days: days));
+      
+      // Get all users who have logs in the specified period
+      final querySnapshot = await _firestore
+          .collection('auto_checkout_logs')
+          .where('timestamp', isGreaterThan: startDate)
+          .get();
+
+      // Group by user
+      Map<String, Map<String, dynamic>> userActivity = {};
+      
+      for (final doc in querySnapshot.docs) {
+        final data = doc.data();
+        final userId = data['userId'] as String? ?? 'unknown';
+        final userName = data['userName'] as String? ?? 'Unknown User';
+        
+        if (!userActivity.containsKey(userId)) {
+          userActivity[userId] = {
+            'userId': userId,
+            'userName': userName,
+            'logCount': 0,
+            'lastActivity': null,
+            'hasErrors': false,
+          };
+        }
+        
+        userActivity[userId]!['logCount'] = (userActivity[userId]!['logCount'] as int) + 1;
+        
+        final timestamp = data['timestamp'] as Timestamp?;
+        if (timestamp != null) {
+          final lastActivity = userActivity[userId]!['lastActivity'] as Timestamp?;
+          if (lastActivity == null || timestamp.compareTo(lastActivity) > 0) {
+            userActivity[userId]!['lastActivity'] = timestamp;
+          }
+        }
+        
+        if (data['isSuccess'] == false) {
+          userActivity[userId]!['hasErrors'] = true;
+        }
+      }
+      
+      // Convert to list and sort by last activity
+      final activeUsers = userActivity.values.toList();
+      activeUsers.sort((a, b) {
+        final aTime = a['lastActivity'] as Timestamp?;
+        final bTime = b['lastActivity'] as Timestamp?;
+        if (aTime == null && bTime == null) return 0;
+        if (aTime == null) return 1;
+        if (bTime == null) return -1;
+        return bTime.compareTo(aTime);
+      });
+      
+      return activeUsers;
+    } catch (e) {
+      log('Error getting active users: $e');
+      return [];
+    }
+  }
+
+  // Export user logs for analysis (CSV format)
+  Future<String> exportUserLogs({
+    required String userId,
+    int days = 30,
+  }) async {
+    try {
+      final now = DateTime.now();
+      final startDate = now.subtract(Duration(days: days));
+      
+      final querySnapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('auto_checkout_logs')
+          .where('timestamp', isGreaterThan: startDate)
+          .orderBy('timestamp', descending: true)
+          .get();
+
+      final logs = querySnapshot.docs.map((doc) => doc.data()).toList();
+      
+      // Create CSV header
+      String csv = 'Timestamp,Action,Success,Note,Error Message,Site Name,Distance,Max Range\n';
+      
+      // Add data rows
+      for (final log in logs) {
+        final timestamp = log['timestamp'] as Timestamp?;
+        final timestampStr = timestamp?.toDate().toIso8601String() ?? 'Unknown';
+        final action = log['action'] ?? 'Unknown';
+        final isSuccess = log['isSuccess'] ?? false;
+        final note = (log['note'] ?? '').replaceAll(',', ';').replaceAll('\n', ' ');
+        final errorMessage = (log['errorMessage'] ?? '').replaceAll(',', ';').replaceAll('\n', ' ');
+        final siteName = log['siteName'] ?? 'Unknown';
+        final distance = log['distance']?.toString() ?? '';
+        final maxRange = log['maxRange']?.toString() ?? '';
+        
+        csv += '$timestampStr,$action,$isSuccess,"$note","$errorMessage",$siteName,$distance,$maxRange\n';
+      }
+      
+      return csv;
+    } catch (e) {
+      log('Error exporting user logs: $e');
+      return 'Error: $e';
+    }
+  }
+
+  // Get system-wide statistics
+  Future<Map<String, dynamic>> getSystemStatistics({
+    int days = 30,
+  }) async {
+    try {
+      final now = DateTime.now();
+      final startDate = now.subtract(Duration(days: days));
+      
+      final querySnapshot = await _firestore
+          .collection('auto_checkout_logs')
+          .where('timestamp', isGreaterThan: startDate)
+          .get();
+
+      final logs = querySnapshot.docs.map((doc) => doc.data()).toList();
+      
+      // Calculate system statistics
+      int totalLogs = logs.length;
+      int successLogs = logs.where((log) => log['isSuccess'] == true).length;
+      int errorLogs = logs.where((log) => log['isSuccess'] == false).length;
+      
+      // Count by action type
+      Map<String, int> actionCounts = {};
+      for (final log in logs) {
+        final action = log['action'] as String? ?? 'unknown';
+        actionCounts[action] = (actionCounts[action] ?? 0) + 1;
+      }
+      
+      // Get unique users
+      Set<String> uniqueUsers = {};
+      for (final log in logs) {
+        final userId = log['userId'] as String?;
+        if (userId != null) {
+          uniqueUsers.add(userId);
+        }
+      }
+      
+      // Get unique sites
+      Set<String> uniqueSites = {};
+      for (final log in logs) {
+        final siteName = log['siteName'] as String?;
+        if (siteName != null) {
+          uniqueSites.add(siteName);
+        }
+      }
+      
+      return {
+        'period': '$days days',
+        'totalLogs': totalLogs,
+        'successLogs': successLogs,
+        'errorLogs': errorLogs,
+        'successRate': totalLogs > 0 ? (successLogs / totalLogs * 100).roundToDouble() : 0.0,
+        'uniqueUsers': uniqueUsers.length,
+        'uniqueSites': uniqueSites.length,
+        'actionCounts': actionCounts,
+        'lastUpdated': DateTime.now().toIso8601String(),
+      };
+    } catch (e) {
+      log('Error getting system statistics: $e');
+      return {
+        'error': e.toString(),
+        'totalLogs': 0,
+        'successLogs': 0,
+        'errorLogs': 0,
+        'successRate': 0.0,
+        'uniqueUsers': 0,
+        'uniqueSites': 0,
+        'actionCounts': {},
+      };
     }
   }
 } 

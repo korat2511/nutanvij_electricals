@@ -700,14 +700,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
       // Handle auto checkout monitoring (only after successful API call)
       if (type == 'check_in' && selectedSite != null) {
-        // Start auto checkout monitoring for check-in (delayed to avoid interference)
-        final site = selectedSite; // Capture the non-null value
-        Future.delayed(const Duration(seconds: 3), () {
-          if (mounted) {
-            AutoCheckoutService.instance.startMonitoring(context, site);
-            SnackBarUtils.showInfo(context, 'Auto checkout enabled. You will be automatically checked out if you move outside the site range.');
-          }
-        });
+        // Only start auto checkout monitoring for non-exempted users
+        if (!isExempted) {
+          // Start auto checkout monitoring for check-in (delayed to avoid interference)
+          final site = selectedSite; // Capture the non-null value
+          Future.delayed(const Duration(seconds: 3), () {
+            if (mounted) {
+              AutoCheckoutService.instance.startMonitoring(context, site);
+              SnackBarUtils.showInfo(context, 'Auto checkout enabled. You will be automatically checked out if you move outside the site range.');
+            }
+          });
+        } else {
+          // For exempted users, show different message
+          SnackBarUtils.showInfo(context, 'Check-in successful. Auto checkout is disabled for exempted users.');
+        }
       } else if (type == 'check_out') {
         // Stop auto checkout monitoring for check-out
         AutoCheckoutService.instance.stopMonitoring();
@@ -1170,6 +1176,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         icon: 'assets/images/marketing.png',
                         label: 'Marketing',
                         onTap: () {},
+                      ),
+                      _buildQuickActionButton(
+                        icon: 'assets/images/setting.png',
+                        label: 'Admin Logs',
+                        onTap: () {
+                          NavigationUtils.push(context, const AutoCheckoutLogsScreen());
+                        },
                       ),
 
                     ],

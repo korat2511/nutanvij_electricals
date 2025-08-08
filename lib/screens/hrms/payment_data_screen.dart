@@ -7,6 +7,7 @@ import '../../providers/user_provider.dart';
 import '../../services/api_service.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../models/payment_data.dart';
+import 'reimbursement_screen.dart';
 
 class PaymentDataScreen extends StatefulWidget {
   const PaymentDataScreen({Key? key}) : super(key: key);
@@ -313,28 +314,6 @@ class _PaymentDataScreenState extends State<PaymentDataScreen> {
     );
   }
 
-  Widget _buildSummaryItem(String label, String value, IconData icon, Color color) {
-    return Column(
-      children: [
-        Icon(icon, color: color, size: 24),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: AppTypography.titleMedium.copyWith(
-            fontWeight: FontWeight.w700,
-            color: color,
-          ),
-        ),
-        Text(
-          label,
-          style: AppTypography.bodySmall.copyWith(
-            color: Colors.grey.shade600,
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildPaymentCard(PaymentData payment) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -437,6 +416,8 @@ class _PaymentDataScreenState extends State<PaymentDataScreen> {
           const Divider(height: 24),
           
           // Salary Breakdown
+          _buildInfoRow('Actual Salary', payment.actualSalary),
+          _buildClickableExpenseRow('Expenses', payment.expense, payment),
           _buildInfoRow('Gross Salary', payment.formattedGrossSalary),
           _buildInfoRow('Basic + DA', '₹${payment.basicDa}'),
           _buildInfoRow('HRA', '₹${payment.hra}'),
@@ -495,6 +476,59 @@ class _PaymentDataScreenState extends State<PaymentDataScreen> {
               style: AppTypography.bodyMedium.copyWith(
                 color: Colors.black87,
                 fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildClickableExpenseRow(String label, String value, PaymentData payment) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 130,
+            child: Text(
+              label,
+              style: AppTypography.bodyMedium.copyWith(
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ReimbursementScreen(),
+                  ),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(
+                  children: [
+                    Text(
+                      value,
+                      style: AppTypography.bodyMedium.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.open_in_new,
+                      size: 16,
+                      color: AppColors.primary,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

@@ -17,6 +17,7 @@ import '../models/task.dart' hide Tag;
 import '../models/payment_data.dart';
 import 'package:file_picker/file_picker.dart';
 import '../models/tag.dart';
+import '../models/reimbursement_data.dart';
 
 class ApiException implements Exception {
   final String message;
@@ -156,16 +157,16 @@ class ApiService {
 
     // Get FCM token
     String? fcmToken;
-    if (Platform.isIOS) {
-      String? apnsToken = await FirebaseMessaging.instance.getAPNSToken();
-
-      log("apnsToken == $apnsToken");
-      if (apnsToken != null) {
-        fcmToken = await FirebaseMessaging.instance.getToken();
-      }
-    } else {
-      fcmToken = await FirebaseMessaging.instance.getToken();
-    }
+    // if (Platform.isIOS) {
+    //   String? apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+    //
+    //   log("apnsToken == $apnsToken");
+    //   if (apnsToken != null) {
+    //     fcmToken = await FirebaseMessaging.instance.getToken();
+    //   }
+    // } else {
+    //   fcmToken = await FirebaseMessaging.instance.getToken();
+    // }
 
 
     return _handleNetworkCall(() async {
@@ -181,7 +182,7 @@ class ApiService {
         body: {
           'mobile': mobile,
           'password': password,
-          'fcm_token': fcmToken,
+          'fcm_token': "fcmToken",
           'device_id': deviceId,
         },
       );
@@ -1438,6 +1439,41 @@ class ApiService {
         },
       );
       return _handleResponse(response, context);
+    });
+  }
+
+  Future<ReimbursementResponse> getMyReimbursement({
+    required BuildContext context,
+    required String apiToken,
+    required int month,
+    required int year,
+  }) async {
+    return _handleNetworkCall(() async {
+      try {
+        // Try the primary endpoint first
+        final response = await http.post(
+          Uri.parse('$baseUrl/getMyReimbursement'),
+          body: {
+            'api_token': apiToken,
+            'month': month.toString(),
+            'year': year.toString(),
+          },
+        );
+
+
+        // Parse the response directly since this endpoint returns data without wrapper
+        if (response.statusCode == 200) {
+          final Map<String, dynamic> data = json.decode(response.body);
+          return ReimbursementResponse.fromJson(data);
+        } else {
+          final data = _handleResponse(response, context);
+          final reimbursementData = data['data'] ?? data;
+          return ReimbursementResponse.fromJson(reimbursementData);
+        }
+      } catch (e) {
+        // Re-throw the actual error for proper debugging
+        rethrow;
+      }
     });
   }
 

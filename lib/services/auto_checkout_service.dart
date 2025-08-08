@@ -268,7 +268,7 @@ class AutoCheckoutService {
     );
 
     final timeSinceLastMovement = DateTime.now().difference(_lastMovementTime!);
-    final fiveMinutes = const Duration(minutes: 5);
+    const fiveMinutes = Duration(minutes: 5);
 
     log('Movement check - Distance moved: ${distanceMoved.round()}m, Time since last movement: ${timeSinceLastMovement.inMinutes}min');
 
@@ -558,44 +558,9 @@ class AutoCheckoutService {
     }
   }
 
-  // Get current monitoring status for debugging
-  String getDebugStatus() {
-    return '''
-🔍 Auto Checkout Debug Status:
-- isMonitoring: $_isMonitoring
-- isTracking: $_isTracking
-- checkInSite: ${_checkInSite?.name ?? 'None'}
-- maxRange: ${_checkInSite?.maxRange ?? 'None'}
-- lastPosition: ${_lastPosition != null ? '${_lastPosition!.latitude}, ${_lastPosition!.longitude}' : 'None'}
-- lastMovementPosition: ${_lastMovementPosition != null ? '${_lastMovementPosition!.latitude}, ${_lastMovementPosition!.longitude}' : 'None'}
-- lastMovementTime: ${_lastMovementTime?.toIso8601String() ?? 'None'}
-- lastLogTime: ${_lastLogTime?.toIso8601String() ?? 'None'}
-- locationTimer: ${_locationTimer != null ? 'Active' : 'Inactive'}
-- loggingTimer: ${_loggingTimer != null ? 'Active' : 'Inactive'}
-''';
-  }
 
-  // Get monitoring status for debugging
-  Map<String, dynamic> getMonitoringStatus() {
-    return {
-      'isMonitoring': _isMonitoring,
-      'isTracking': _isTracking,
-      'checkInSite': _checkInSite?.name,
-      'maxRange': _checkInSite?.maxRange,
-      'lastPosition': _lastPosition != null ? {
-        'latitude': _lastPosition!.latitude,
-        'longitude': _lastPosition!.longitude,
-      } : null,
-      'lastMovementPosition': _lastMovementPosition != null ? {
-        'latitude': _lastMovementPosition!.latitude,
-        'longitude': _lastMovementPosition!.longitude,
-      } : null,
-      'lastMovementTime': _lastMovementTime?.toIso8601String(),
-      'lastLogTime': _lastLogTime?.toIso8601String(),
-      'trackingInterval': _isTracking ? '5 minutes' : 'stopped',
-      'loggingInterval': '5 minutes',
-    };
-  }
+
+
 
   // Helper method to get user info for logging
   Map<String, String> _getUserInfo() {
@@ -728,6 +693,17 @@ class AutoCheckoutService {
   // Check for auto checkout when app starts (called from main.dart or splash screen)
   Future<void> checkForAutoCheckoutOnAppStart(BuildContext context) async {
     try {
+      // Check if user is exempted from location checking
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final user = userProvider.user;
+      
+      if (user != null && user.data.isCheckInExmpted == 1) {
+        log('User is exempted from location checking, skipping auto checkout monitoring');
+        // Clear any existing monitoring state for exempted users
+        await _clearMonitoringState();
+        return;
+      }
+      
       // Load monitoring state from SharedPreferences
       final savedSite = await _loadMonitoringState();
       

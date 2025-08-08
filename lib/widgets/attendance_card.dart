@@ -340,37 +340,7 @@ class _AttendanceCardState extends State<AttendanceCard> {
           _buildLocationSection(),
           const SizedBox(height: 16),
           
-          // Auto checkout indicator
-          if (widget.isAutoCheckoutEnabled && widget.checkInSite != null) ...[
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blue.withOpacity(0.3)),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.location_on,
-                    color: Colors.blue,
-                    size: 16,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Auto checkout enabled for ${widget.checkInSite!.name} (${widget.checkInSite!.maxRange ?? 500}m range)',
-                      style: AppTypography.bodySmall.copyWith(
-                        color: Colors.blue.shade700,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-          ],
+
           
           SizedBox(
             width: double.infinity,
