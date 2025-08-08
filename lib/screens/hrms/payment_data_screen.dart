@@ -1,4 +1,10 @@
+import 'dart:io';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:intl/intl.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -7,6 +13,7 @@ import '../../providers/user_provider.dart';
 import '../../services/api_service.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../models/payment_data.dart';
+import '../../widgets/custom_button.dart';
 import 'reimbursement_screen.dart';
 
 class PaymentDataScreen extends StatefulWidget {
@@ -20,7 +27,7 @@ class _PaymentDataScreenState extends State<PaymentDataScreen> {
   List<PaymentData> _paymentData = [];
   bool _isLoading = true;
   String? _error;
-  
+
   // Month and year selection
   int _selectedMonth = DateTime.now().month;
   int _selectedYear = DateTime.now().year;
@@ -40,7 +47,7 @@ class _PaymentDataScreenState extends State<PaymentDataScreen> {
     try {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       final apiToken = userProvider.user?.data.apiToken ?? '';
-      
+
       final paymentData = await ApiService().getPaymentData(
         context: context,
         apiToken: apiToken,
@@ -63,8 +70,18 @@ class _PaymentDataScreenState extends State<PaymentDataScreen> {
 
   Future<void> _selectMonth() async {
     final List<String> months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December'
     ];
 
     final List<int> years = List.generate(
@@ -110,7 +127,7 @@ class _PaymentDataScreenState extends State<PaymentDataScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // Year Dropdown
                   DropdownButtonFormField<int>(
                     value: tempYear,
@@ -158,8 +175,18 @@ class _PaymentDataScreenState extends State<PaymentDataScreen> {
 
   String _getMonthName(int month) {
     const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December'
     ];
     return months[month - 1];
   }
@@ -203,31 +230,33 @@ class _PaymentDataScreenState extends State<PaymentDataScreen> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                                             GestureDetector(
-                         onTap: _selectMonth,
-                         child: Container(
-                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                           decoration: BoxDecoration(
-                             color: AppColors.primary.withOpacity(0.1),
-                             borderRadius: BorderRadius.circular(8),
-                             border: Border.all(color: AppColors.primary),
-                           ),
-                           child: Row(
-                             mainAxisSize: MainAxisSize.min,
-                             children: [
-                               Text(
-                                 '${_getMonthName(_selectedMonth)} $_selectedYear',
-                                 style: AppTypography.bodyMedium.copyWith(
-                                   color: AppColors.primary,
-                                   fontWeight: FontWeight.w600,
-                                 ),
-                               ),
-                               const SizedBox(width: 8),
-                               const Icon(Icons.date_range, color: AppColors.primary, size: 16),
-                             ],
-                           ),
-                         ),
-                       ),
+                      GestureDetector(
+                        onTap: _selectMonth,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: AppColors.primary),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '${_getMonthName(_selectedMonth)} $_selectedYear',
+                                style: AppTypography.bodyMedium.copyWith(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Icon(Icons.date_range,
+                                  color: AppColors.primary, size: 16),
+                            ],
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -238,7 +267,7 @@ class _PaymentDataScreenState extends State<PaymentDataScreen> {
               ],
             ),
           ),
-          
+
           Expanded(
             child: _isLoading
                 ? const Center(
@@ -249,7 +278,8 @@ class _PaymentDataScreenState extends State<PaymentDataScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.error_outline, size: 64, color: Colors.grey.shade400),
+                            Icon(Icons.error_outline,
+                                size: 64, color: Colors.grey.shade400),
                             const SizedBox(height: 16),
                             Text(
                               'Failed to load payment data',
@@ -278,7 +308,8 @@ class _PaymentDataScreenState extends State<PaymentDataScreen> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.receipt_long, size: 64, color: Colors.grey.shade400),
+                                Icon(Icons.receipt_long,
+                                    size: 64, color: Colors.grey.shade400),
                                 const SizedBox(height: 16),
                                 Text(
                                   'No payment data found',
@@ -300,7 +331,8 @@ class _PaymentDataScreenState extends State<PaymentDataScreen> {
                         : RefreshIndicator(
                             onRefresh: _fetchPaymentData,
                             child: ListView.builder(
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 16),
                               itemCount: _paymentData.length,
                               itemBuilder: (context, index) {
                                 final payment = _paymentData[index];
@@ -372,9 +404,9 @@ class _PaymentDataScreenState extends State<PaymentDataScreen> {
               ),
             ],
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Net Payable Salary (Highlighted)
           Container(
             width: double.infinity,
@@ -404,17 +436,20 @@ class _PaymentDataScreenState extends State<PaymentDataScreen> {
               ],
             ),
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Basic Information
-          _buildInfoRow('Department', payment.department.isNotEmpty ? payment.department : 'N/A'),
-          _buildInfoRow('Section', payment.section.isNotEmpty ? payment.section : 'N/A'),
+          _buildInfoRow('Department',
+              payment.department.isNotEmpty ? payment.department : 'N/A'),
+          _buildInfoRow(
+              'Section', payment.section.isNotEmpty ? payment.section : 'N/A'),
           _buildInfoRow('Mode of Payment', payment.modeOfPayment),
-          _buildInfoRow('Working Days', '${payment.workedDays}/${payment.workingDays}'),
-          
+          _buildInfoRow(
+              'Working Days', '${payment.workedDays}/${payment.workingDays}'),
+
           const Divider(height: 24),
-          
+
           // Salary Breakdown
           _buildInfoRow('Actual Salary', payment.actualSalary),
           _buildClickableExpenseRow('Expenses', payment.expense, payment),
@@ -423,9 +458,9 @@ class _PaymentDataScreenState extends State<PaymentDataScreen> {
           _buildInfoRow('HRA', '₹${payment.hra}'),
           _buildInfoRow('Performance', '₹${payment.performance2}'),
           _buildInfoRow('Payable Salary', payment.formattedPayableSalary),
-          
+
           const Divider(height: 24),
-          
+
           // Deductions
           _buildInfoRow('PF', '₹${payment.pf}'),
           _buildInfoRow('ESI', '₹${payment.esi}'),
@@ -433,23 +468,34 @@ class _PaymentDataScreenState extends State<PaymentDataScreen> {
           _buildInfoRow('Professional Tax', '₹${payment.professionalTax}'),
           _buildInfoRow('Other Deductions', '₹${payment.otherDeduction}'),
           _buildInfoRow('Total Deductions', payment.formattedTotalDeduction),
-          
+
           // Overtime (if applicable)
-          if (double.tryParse(payment.totalOt) != null && double.parse(payment.totalOt) > 0) ...[
+          if (double.tryParse(payment.totalOt) != null &&
+              double.parse(payment.totalOt) > 0) ...[
             const Divider(height: 24),
             _buildInfoRow('OT Rate/Hour', '₹${payment.otPerHr}'),
             _buildInfoRow('OT Hours', payment.totalOt),
-            _buildInfoRow('OT Amount', '₹${(double.tryParse(payment.otPerHr) ?? 0) * (double.tryParse(payment.totalOt) ?? 0)}'),
+            _buildInfoRow('OT Amount',
+                '₹${(double.tryParse(payment.otPerHr) ?? 0) * (double.tryParse(payment.totalOt) ?? 0)}'),
           ],
-          
+
           // Bank Details (if available)
           if (payment.bankName.isNotEmpty) ...[
             const Divider(height: 24),
             _buildInfoRow('Bank Name', payment.bankName),
-            if (payment.bankAccountNumber != null && payment.bankAccountNumber!.isNotEmpty)
+            if (payment.bankAccountNumber != null &&
+                payment.bankAccountNumber!.isNotEmpty)
               _buildInfoRow('Account Number', payment.bankAccountNumber!),
             _buildInfoRow('IFSC Code', payment.ifscCode),
           ],
+          payment.status == "paid"
+              ? CustomButton(
+                  text: "Get PaySlip",
+                  onPressed: () {
+                    print("Click PaySlip");
+                    downloadPDF(context, payment.payslip_pdf_url);
+                  })
+              : const SizedBox.shrink(),
         ],
       ),
     );
@@ -484,7 +530,8 @@ class _PaymentDataScreenState extends State<PaymentDataScreen> {
     );
   }
 
-  Widget _buildClickableExpenseRow(String label, String value, PaymentData payment) {
+  Widget _buildClickableExpenseRow(
+      String label, String value, PaymentData payment) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -549,4 +596,84 @@ class _PaymentDataScreenState extends State<PaymentDataScreen> {
         return Colors.grey;
     }
   }
-} 
+
+  Future<void> downloadPDF(BuildContext context, String pSlipUrl) async {
+    try {
+      // Ask for permission
+      print("Pay Slip :$pSlipUrl");
+      bool isGranted = await requestStoragePermission();
+      if (!isGranted) {
+        Fluttertoast.showToast(msg: "❌ Storage permission denied");
+        return;
+      }
+
+      final fileName =
+          "NEPL_${DateFormat('yyyy-MM-dd').format(DateTime.now())}.pdf";
+      final downloadPath = "/storage/emulated/0/Download/$fileName";
+      final file = File(downloadPath);
+
+      // Delete existing file to prevent duplicates
+      if (await file.exists()) {
+        await file.delete();
+      }
+
+      final dio = Dio();
+
+      // Show progress dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) {
+          return AlertDialog(
+            title: Text("Downloading..."),
+            content: StatefulBuilder(
+              builder: (context, setState) {
+                double progress = 0.0;
+
+                dio.download(
+                  "$pSlipUrl",
+                  downloadPath,
+                  onReceiveProgress: (received, total) {
+                    if (total != -1) {
+                      setState(() {
+                        progress = received / total;
+                      });
+                    }
+                  },
+                ).then((_) {
+                  Navigator.of(context).pop(); // Close dialog
+                  Fluttertoast.showToast(
+                      msg: "✅ Downloaded to Downloads folder");
+                }).catchError((e) {
+                  Navigator.of(context).pop(); // Close dialog
+                  Fluttertoast.showToast(msg: "❌ Download failed");
+                  print("Download error: $e");
+                });
+
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    LinearProgressIndicator(value: progress),
+                    SizedBox(height: 10),
+                    Text("${(progress * 100).toStringAsFixed(0)}%"),
+                  ],
+                );
+              },
+            ),
+          );
+        },
+      );
+    } catch (e) {
+      Fluttertoast.showToast(msg: "❌ Error occurred");
+      print("❌ Error: $e");
+    }
+  }
+
+  Future<bool> requestStoragePermission() async {
+    if (Platform.isAndroid) {
+      final status = await Permission.manageExternalStorage.request();
+      return status.isGranted;
+    }
+    return true;
+  }
+}

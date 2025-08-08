@@ -43,6 +43,7 @@ class PaymentData {
   final String status;
   final String createdAt;
   final String updatedAt;
+  final String payslip_pdf_url;
 
   PaymentData({
     required this.id,
@@ -89,6 +90,7 @@ class PaymentData {
     required this.status,
     required this.createdAt,
     required this.updatedAt,
+    required this.payslip_pdf_url,
   });
 
   factory PaymentData.fromJson(Map<String, dynamic> json) {
@@ -137,6 +139,7 @@ class PaymentData {
       status: json['status']?.toString() ?? 'pending',
       createdAt: json['created_at']?.toString() ?? '',
       updatedAt: json['updated_at']?.toString() ?? '',
+      payslip_pdf_url: json['payslip_pdf_url']?.toString() ?? '',
     );
   }
 
