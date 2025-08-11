@@ -10,7 +10,12 @@ import 'edit_profile_screen.dart';
 import 'viewer/full_screen_image_viewer.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({Key? key}) : super(key: key);
+  final int userId;
+
+  const ProfileScreen({
+    Key? key,
+    required this.userId,
+  }) : super(key: key);
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -38,7 +43,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final response = await apiService.getProfile(
         context: context,
         apiToken: user.data.apiToken,
-        userId: user.data.id.toString(),
+        userId: widget.userId.toString(),
       );
 
       setState(() {

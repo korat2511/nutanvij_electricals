@@ -408,6 +408,27 @@ class AutoCheckoutService {
       }
 
       log('✅ User found: ${user.data.name}');
+      
+      // Get context for API calls
+      final context = _context ?? ForegroundNotificationService.navigatorKey.currentContext;
+      if (context == null) {
+        throw Exception('No context available for API call');
+      }
+      
+      // Check if user is actually checked in before attempting auto checkout
+      try {
+        final attendanceData = await ApiService().attendanceCheck(context, user.data.apiToken);
+        if (attendanceData != null && attendanceData['flag'] == 'check_out') {
+          log('✅ User is already checked out - stopping monitoring');
+          stopMonitoring();
+          return;
+        }
+        log('✅ User is checked in - proceeding with auto checkout');
+      } catch (e) {
+        log('⚠️ Could not verify attendance status: $e');
+        // Continue with auto checkout anyway
+      }
+      
       log('🔄 Calling API for auto checkout...');
 
       // Get current location and address for auto checkout
@@ -446,20 +467,41 @@ class AutoCheckoutService {
       
       // Get address for the current location with timeout
       final address = await _getAddressWithTimeout(currentPosition);
-
-      // Call the checkout API with actual location data
-      await ApiService().saveAttendance(
-        context: _context ?? ForegroundNotificationService.navigatorKey.currentContext!,
-        apiToken: user.data.apiToken,
-        type: 'check_out',
-        latitude: currentPosition.latitude.toString(),
-        longitude: currentPosition.longitude.toString(),
-        address: address,
-        imagePath: '', // No image for auto checkout
-        siteId: null,
-      );
-
-      log('✅ API call successful');
+      
+      try {
+        log('🔄 Making API call with data:');
+        log('  - API Token: ${user.data.apiToken.substring(0, 10)}...');
+        log('  - Type: check_out');
+        log('  - Latitude: ${currentPosition.latitude}');
+        log('  - Longitude: ${currentPosition.longitude}');
+        log('  - Address: $address');
+        
+        await ApiService().saveAttendance(
+          context: context,
+          apiToken: user.data.apiToken,
+          type: 'check_out',
+          latitude: currentPosition.latitude.toString(),
+          longitude: currentPosition.longitude.toString(),
+          address: address,
+          imagePath: '', // No image for auto checkout
+          siteId: null,
+        );
+        log('✅ API call successful');
+      } catch (apiError) {
+        log('❌ API call failed: $apiError');
+        log('❌ API error type: ${apiError.runtimeType}');
+        log('❌ API error details: ${apiError.toString()}');
+        
+        // Check if it's a specific API error
+        if (apiError.toString().contains('already checked out') || 
+            apiError.toString().contains('not checked in')) {
+          log('✅ User already checked out or not checked in - stopping monitoring');
+          stopMonitoring();
+          return; // Don't treat this as an error
+        }
+        // Re-throw other API errors
+        rethrow;
+      }
 
       // Log auto checkout success
       _logAutoCheckoutSuccess('background');
@@ -521,6 +563,32 @@ class AutoCheckoutService {
     
     // Restore original max range
     _checkInSite = _checkInSite!.copyWith(maxRange: originalMaxRange);
+  }
+
+  // Test auto checkout directly (bypasses all checks)
+  Future<void> testAutoCheckoutDirectly(BuildContext context) async {
+    log('🧪 Testing auto checkout directly');
+    
+    // Set context for testing
+    _context = context;
+    
+    // Create a dummy site for testing
+    final testSite = Site(
+      id: 999,
+      name: 'Test Site',
+      latitude: '21.2991211',
+      longitude: '72.9013905',
+      address: 'Test Address',
+      company: 'Test Company',
+      status: 'Active',
+      pinned: 0,
+      siteImages: [],
+      maxRange: 500,
+    );
+    _checkInSite = testSite;
+    
+    log('🔄 Testing auto checkout with dummy site');
+    await _performAutoCheckout();
   }
 
   // Manually trigger a location check for testing
@@ -806,18 +874,24 @@ class AutoCheckoutService {
         log('🚨 BACKGROUND AUTO CHECKOUT TRIGGERED!');
         
         // Set context for API call (use global navigator context)
-        _context = ForegroundNotificationService.navigatorKey.currentContext;
-        _checkInSite = savedSite;
-        
-        // Perform auto checkout
-        await _performAutoCheckout();
-        
-        // Show notification to user
-        if (_context != null && _context!.mounted) {
-          SnackBarUtils.showInfo(
-            _context!,
-            'Auto checkout: You moved outside the site range while the app was in background (${savedSite.name})',
-          );
+        final context = ForegroundNotificationService.navigatorKey.currentContext;
+        if (context != null) {
+          _context = context;
+          _checkInSite = savedSite;
+          
+          // Perform auto checkout
+          await _performAutoCheckout();
+          
+          // Show notification to user
+          if (_context != null && _context!.mounted) {
+            SnackBarUtils.showInfo(
+              _context!,
+              'Auto checkout: You moved outside the site range while the app was in background (${savedSite.name})',
+            );
+          }
+        } else {
+          log('❌ No context available for background auto checkout');
+          _logAutoCheckoutError('No context available for background auto checkout', 'background');
         }
       } else {
         log('User is within range in background - continuing monitoring');

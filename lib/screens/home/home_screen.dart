@@ -1019,7 +1019,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         title: const Text('Profile'),
                         onTap: () {
                           NavigationUtils.pop(context);
-                          NavigationUtils.push(context, const ProfileScreen());
+                          NavigationUtils.push(context,  ProfileScreen(
+                            userId: user!.data.id,
+                          ));
                         },
                       ),
 
