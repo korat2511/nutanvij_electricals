@@ -28,7 +28,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadProfileData() async {
     setState(() => _isLoading = true);
-    
+
     try {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       final user = userProvider.user;
@@ -38,7 +38,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final response = await apiService.getProfile(
         context: context,
         apiToken: user.data.apiToken,
-        userId : user.data.id.toString(),
+        userId: user.data.id.toString(),
       );
 
       setState(() {
@@ -90,7 +90,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       _buildSitesCard(),
                       const SizedBox(height: 16),
                       _buildAdditionalInfoCard(),
-                      SizedBox(height: MediaQuery.of(context).padding.bottom + 20),
+                      SizedBox(
+                          height: MediaQuery.of(context).padding.bottom + 20),
                     ],
                   ),
                 ),
@@ -147,7 +148,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // User Name
           Text(
             _profileData!['name'] ?? 'N/A',
@@ -158,7 +159,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
-          
+
           // Employee ID
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -175,12 +176,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          
+
           // Status
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
-              color: _profileData!['status'] == 'Active' 
+              color: _profileData!['status'] == 'Active'
                   ? Colors.green.withOpacity(0.1)
                   : Colors.red.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
@@ -188,7 +189,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Text(
               _profileData!['status'] ?? 'N/A',
               style: AppTypography.bodySmall.copyWith(
-                color: _profileData!['status'] == 'Active' ? Colors.green : Colors.red,
+                color: _profileData!['status'] == 'Active'
+                    ? Colors.green
+                    : Colors.red,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -224,15 +227,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          
           _buildInfoRow('Name', _profileData!['name'] ?? 'N/A'),
           _buildInfoRow('Email', _profileData!['email'] ?? 'N/A'),
           _buildInfoRow('Mobile', _profileData!['mobile'] ?? 'N/A'),
-          _buildInfoRow('Designation', _profileData!['designation']?['name'] ?? 'N/A'),
+          _buildInfoRow(
+              'Designation', _profileData!['designation']?['name'] ?? 'N/A'),
           if (_profileData!['sub_department'] != null)
-            _buildInfoRow('Department', _profileData!['sub_department']['name'] ?? 'N/A'),
+            _buildInfoRow(
+                'Department', _profileData!['sub_department']['name'] ?? 'N/A'),
           _buildInfoRow('Date of Birth', _profileData!['dob'] ?? 'N/A'),
-          _buildInfoRow('Date of Joining', _profileData!['date_of_joining'] ?? 'N/A'),
+          _buildInfoRow(
+              'Date of Joining', _profileData!['date_of_joining'] ?? 'N/A'),
           _buildInfoRow('Salary', _profileData!['salary'] ?? 'N/A'),
         ],
       ),
@@ -265,12 +270,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          
           _buildInfoRow('Bank Name', _profileData!['bank_name'] ?? 'N/A'),
-          _buildInfoRow('Account No.', _profileData!['bank_account_no'] ?? 'N/A'),
+          _buildInfoRow(
+              'Account No.', _profileData!['bank_account_no'] ?? 'N/A'),
           _buildInfoRow('IFSC Code', _profileData!['ifsc_code'] ?? 'N/A'),
           _buildInfoRow('PAN Card', _profileData!['pan_card_no'] ?? 'N/A'),
-          _buildInfoRow('Aadhar Card', _profileData!['aadhar_card_no'] ?? 'N/A'),
+          _buildInfoRow(
+              'Aadhar Card', _profileData!['aadhar_card_no'] ?? 'N/A'),
         ],
       ),
     );
@@ -278,7 +284,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildDocumentsCard() {
     final documents = <String, String?>{};
-    
+
     if (_profileData!['addhar_card_front_path'] != null) {
       documents['Aadhar Front'] = _profileData!['addhar_card_front_path'];
     }
@@ -321,7 +327,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          
           GridView.count(
             padding: EdgeInsets.zero,
             shrinkWrap: true,
@@ -341,7 +346,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildSitesCard() {
     final sites = _profileData!['sites'] as List<dynamic>? ?? [];
-    
+
     if (sites.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -363,15 +368,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Assigned Sites',
-            style: AppTypography.titleMedium.copyWith(
-              fontWeight: FontWeight.w600,
-              color: Colors.black87,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Assigned Sites',
+                style: AppTypography.titleMedium.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+              Text(
+                "+ Add or Remove",
+                style: AppTypography.labelMedium.copyWith(
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.primary,
+                ),
+              )
+            ],
           ),
           const SizedBox(height: 16),
-          
           ...sites.map((site) => _buildSiteCard(site)).toList(),
         ],
       ),
@@ -404,10 +420,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          
-          _buildInfoRow('Document Status', _profileData!['document_status'] ?? 'N/A'),
-          _buildInfoRow('Has Keypad Mobile', _profileData!['has_keypad_mobile'] == 1 ? 'Yes' : 'No'),
-          _buildInfoRow('Check-in Exempted', _profileData!['is_checkin_exmpted'] == 1 ? 'Yes' : 'No'),
+          _buildInfoRow(
+              'Document Status', _profileData!['document_status'] ?? 'N/A'),
+          _buildInfoRow('Has Keypad Mobile',
+              _profileData!['has_keypad_mobile'] == 1 ? 'Yes' : 'No'),
+          _buildInfoRow('Check-in Exempted',
+              _profileData!['is_checkin_exmpted'] == 1 ? 'Yes' : 'No'),
         ],
       ),
     );
@@ -448,7 +466,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     const cardSpacing = 12.0;
     final availableWidth = screenWidth - horizontalPadding;
     final cardWidth = (availableWidth - cardSpacing) / 2;
-    
+
     return GestureDetector(
       onTap: () {
         NavigationUtils.push(
@@ -505,11 +523,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: Center(
                           child: CircularProgressIndicator(
                             value: loadingProgress.expectedTotalBytes != null
-                                ? loadingProgress.cumulativeBytesLoaded / 
-                                  loadingProgress.expectedTotalBytes!
+                                ? loadingProgress.cumulativeBytesLoaded /
+                                    loadingProgress.expectedTotalBytes!
                                 : null,
                             strokeWidth: 2,
-                            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                                AppColors.primary),
                           ),
                         ),
                       );
@@ -564,8 +583,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         border: Border.all(color: Colors.grey.shade200),
       ),
       child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Row(
             children: [
               const Icon(
@@ -575,9 +594,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               const SizedBox(width: 8),
               Expanded(
-          child: Text(
+                child: Text(
                   site['name'] ?? 'N/A',
-            style: AppTypography.bodyMedium.copyWith(
+                  style: AppTypography.bodyMedium.copyWith(
                     fontWeight: FontWeight.w600,
                     color: Colors.black87,
                   ),
@@ -586,7 +605,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: site['status'] == 'Active' 
+                  color: site['status'] == 'Active'
                       ? Colors.green.withOpacity(0.1)
                       : Colors.red.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
@@ -594,11 +613,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Text(
                   site['status'] ?? 'N/A',
                   style: AppTypography.bodySmall.copyWith(
-                    color: site['status'] == 'Active' ? Colors.green : Colors.red,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
+                    color:
+                        site['status'] == 'Active' ? Colors.green : Colors.red,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -608,15 +628,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               color: Colors.grey.shade600,
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Company: ${site['company'] ?? 'N/A'}',
-            style: AppTypography.bodySmall.copyWith(
-              color: Colors.grey.shade600,
-          ),
-        ),
-      ],
+        ],
       ),
     );
   }
-} 
+}

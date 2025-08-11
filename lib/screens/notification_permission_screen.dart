@@ -45,7 +45,7 @@ class _NotificationPermissionScreenState extends State<NotificationPermissionScr
                   color: AppColors.primary.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
+                child: const Icon(
                   Icons.notifications_active,
                   size: 60,
                   color: AppColors.primary,

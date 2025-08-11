@@ -1,13 +1,17 @@
 import 'dart:io';
 
+// import 'package:dio/dio.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:fluttertoast/fluttertoast.dart';
+
+// import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
+import 'package:path_provider/path_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
+import '../../core/utils/responsive.dart';
 import '../../core/utils/snackbar_utils.dart';
 import '../../providers/user_provider.dart';
 import '../../services/api_service.dart';
@@ -488,13 +492,20 @@ class _PaymentDataScreenState extends State<PaymentDataScreen> {
               _buildInfoRow('Account Number', payment.bankAccountNumber!),
             _buildInfoRow('IFSC Code', payment.ifscCode),
           ],
+
           payment.status == "paid"
-              ? CustomButton(
-                  text: "Get PaySlip",
-                  onPressed: () {
-                    print("Click PaySlip");
-                    downloadPDF(context, payment.payslip_pdf_url);
-                  })
+              ? Column(
+                  children: [
+                    const SizedBox(
+                      height: 10,
+                    ),
+                    CustomButton(
+                        text: "Get PaySlip",
+                        onPressed: () {
+                          downloadPDF(context, payment.payslip_pdf_url);
+                        }),
+                  ],
+                )
               : const SizedBox.shrink(),
         ],
       ),
@@ -569,7 +580,7 @@ class _PaymentDataScreenState extends State<PaymentDataScreen> {
                       ),
                     ),
                     const SizedBox(width: 4),
-                    Icon(
+                    const Icon(
                       Icons.open_in_new,
                       size: 16,
                       color: AppColors.primary,
@@ -603,14 +614,15 @@ class _PaymentDataScreenState extends State<PaymentDataScreen> {
       print("Pay Slip :$pSlipUrl");
       bool isGranted = await requestStoragePermission();
       if (!isGranted) {
-        Fluttertoast.showToast(msg: "❌ Storage permission denied");
+        SnackBarUtils.showError(context, "Storage permission denied");
+
         return;
       }
 
       final fileName =
           "NEPL_${DateFormat('yyyy-MM-dd').format(DateTime.now())}.pdf";
-      final downloadPath = "/storage/emulated/0/Download/$fileName";
-      final file = File(downloadPath);
+      final downloadPath = await getDownloadDirectoryPath();
+      final file = File('$downloadPath/$fileName');
 
       // Delete existing file to prevent duplicates
       if (await file.exists()) {
@@ -625,14 +637,14 @@ class _PaymentDataScreenState extends State<PaymentDataScreen> {
         barrierDismissible: false,
         builder: (ctx) {
           return AlertDialog(
-            title: Text("Downloading..."),
+            title: const Text("Downloading..."),
             content: StatefulBuilder(
               builder: (context, setState) {
                 double progress = 0.0;
 
                 dio.download(
                   "$pSlipUrl",
-                  downloadPath,
+                  file.path,
                   onReceiveProgress: (received, total) {
                     if (total != -1) {
                       setState(() {
@@ -641,12 +653,14 @@ class _PaymentDataScreenState extends State<PaymentDataScreen> {
                     }
                   },
                 ).then((_) {
-                  Navigator.of(context).pop(); // Close dialog
-                  Fluttertoast.showToast(
-                      msg: "✅ Downloaded to Downloads folder");
+                  Navigator.of(context).pop();
+                  final message = Platform.isAndroid
+                      ? "Downloaded to Downloads folder"
+                      : "Downloaded to app documents folder";
+                  SnackBarUtils.showSuccess(context, message);
                 }).catchError((e) {
-                  Navigator.of(context).pop(); // Close dialog
-                  Fluttertoast.showToast(msg: "❌ Download failed");
+                  Navigator.of(context).pop();
+                  SnackBarUtils.showError(context, "Download failed");
                   print("Download error: $e");
                 });
 
@@ -654,7 +668,7 @@ class _PaymentDataScreenState extends State<PaymentDataScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     LinearProgressIndicator(value: progress),
-                    SizedBox(height: 10),
+                    const SizedBox(height: 10),
                     Text("${(progress * 100).toStringAsFixed(0)}%"),
                   ],
                 );
@@ -664,8 +678,35 @@ class _PaymentDataScreenState extends State<PaymentDataScreen> {
         },
       );
     } catch (e) {
-      Fluttertoast.showToast(msg: "❌ Error occurred");
+      SnackBarUtils.showError(context, "Error occurred $e");
       print("❌ Error: $e");
+    }
+  }
+
+  Future<String> getDownloadDirectoryPath() async {
+    if (Platform.isAndroid) {
+      // For Android, try to get the Downloads directory
+      try {
+        final directory = await getExternalStorageDirectory();
+        if (directory != null) {
+          // Navigate to Downloads folder
+          final downloadsPath = '${directory.path}/../Download';
+          final downloadsDir = Directory(downloadsPath);
+          if (!await downloadsDir.exists()) {
+            await downloadsDir.create(recursive: true);
+          }
+          return downloadsPath;
+        }
+      } catch (e) {
+        print('Error accessing external storage: $e');
+      }
+      // Fallback to app documents directory
+      final appDir = await getApplicationDocumentsDirectory();
+      return appDir.path;
+    } else {
+      // For iOS, use the documents directory
+      final documentsDir = await getApplicationDocumentsDirectory();
+      return documentsDir.path;
     }
   }
 
@@ -674,6 +715,7 @@ class _PaymentDataScreenState extends State<PaymentDataScreen> {
       final status = await Permission.manageExternalStorage.request();
       return status.isGranted;
     }
+    // iOS doesn't need storage permission for app documents directory
     return true;
   }
 }
