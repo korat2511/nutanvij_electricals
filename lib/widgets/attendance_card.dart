@@ -163,7 +163,6 @@ class _AttendanceCardState extends State<AttendanceCard> {
                   if (_locationErrorType != null && !_isLoadingLocation)
                     Row(
                       children: [
-
                         Expanded(
                           child: Text(
                             _locationErrorMessage ?? 'Failed to get location',

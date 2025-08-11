@@ -8,6 +8,8 @@ import '../models/notification_model.dart';
 import '../services/notification_storage_service.dart';
 import '../widgets/custom_app_bar.dart';
 import '../screens/task/task_details_screen.dart';
+import 'home/home_screen.dart';
+import 'task/task_list_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({Key? key}) : super(key: key);
@@ -82,7 +84,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Clear All Notifications'),
-        content: const Text('Are you sure you want to clear all notifications? This action cannot be undone.'),
+        content: const Text(
+            'Are you sure you want to clear all notifications? This action cannot be undone.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -111,43 +114,37 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     // Handle different notification types
     final data = notification.data;
-    
+
     if (data.containsKey('screen')) {
       final screen = data['screen'];
-      
+
       switch (screen) {
         case 'taskDetailsScreen':
           if (data.containsKey('task_id')) {
-            print('Navigate to task details: ${data['task_id']}');
-            NavigationUtils.push(context, TaskDetailsScreen(taskId: data['task_id']));
+            NavigationUtils.push(
+                context, TaskDetailsScreen(taskId: data['task_id']));
           }
           break;
-        case 'siteDetailsScreen':
+        case 'taskListScreen':
           if (data.containsKey('site_id')) {
-            print('Navigate to site details: ${data['site_id']}');
-            // NavigationUtils.push(context, SiteDetailsScreen(siteId: data['site_id']));
+            NavigationUtils.push(
+                context, TaskListScreen(siteId: data['site_id']));
           }
           break;
-        case 'attendanceScreen':
-          print('Navigate to attendance screen');
-          // NavigationUtils.push(context, AttendanceScreen());
-          break;
-        case 'leaveScreen':
-          print('Navigate to leave screen');
-          // NavigationUtils.push(context, LeaveScreen());
+        case 'homeScreen':
+          NavigationUtils.push(context, const HomeScreen());
           break;
         default:
-          // Show notification details for unknown screen
+
           _showNotificationDetails(notification);
           break;
       }
     } else {
-      // Fallback to old logic
+
       if (data.containsKey('task_id')) {
-        print('Navigate to task: ${data['task_id']}');
+
         // NavigationUtils.push(context, TaskDetailsScreen(taskId: data['task_id']));
       } else if (data.containsKey('site_id')) {
-        print('Navigate to site: ${data['site_id']}');
         // NavigationUtils.push(context, SiteDetailsScreen(siteId: data['site_id']));
       } else {
         // Show notification details
@@ -177,7 +174,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               const SizedBox(height: 16),
               Text(
                 'Data:',
-                style: AppTypography.bodySmall.copyWith(fontWeight: FontWeight.w600),
+                style: AppTypography.bodySmall
+                    .copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
               Container(
@@ -246,7 +244,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           child: Text(
                             notification.title,
                             style: AppTypography.bodyMedium.copyWith(
-                              fontWeight: isUnread ? FontWeight.w600 : FontWeight.w500,
+                              fontWeight:
+                                  isUnread ? FontWeight.w600 : FontWeight.w500,
                               color: isUnread ? Colors.black87 : Colors.black54,
                             ),
                             maxLines: 2,
@@ -402,7 +401,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   context: context,
                   builder: (context) => AlertDialog(
                     title: const Text('Clear All Notifications'),
-                    content: const Text('Are you sure you want to clear all notifications? This action cannot be undone.'),
+                    content: const Text(
+                        'Are you sure you want to clear all notifications? This action cannot be undone.'),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(),
@@ -413,7 +413,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           Navigator.of(context).pop();
                           _clearAllNotifications();
                         },
-                        style: TextButton.styleFrom(foregroundColor: Colors.red),
+                        style:
+                            TextButton.styleFrom(foregroundColor: Colors.red),
                         child: const Text('Clear All'),
                       ),
                     ],
@@ -473,4 +474,4 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       ),
     );
   }
-} 
+}
