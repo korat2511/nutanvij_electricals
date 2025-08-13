@@ -419,11 +419,16 @@ class AutoCheckoutService {
       try {
         final attendanceData = await ApiService().attendanceCheck(context, user.data.apiToken);
         if (attendanceData != null && attendanceData['flag'] == 'check_out') {
-          log('✅ User is already checked out - stopping monitoring');
+          log('✅ User is checked in (flag=check_out) - proceeding with auto checkout');
+        } else if (attendanceData != null && attendanceData['flag'] == 'check_in') {
+          log('❌ User is already checked out (flag=check_in) - stopping monitoring');
+          stopMonitoring();
+          return;
+        } else {
+          log('❌ User is not checked in - stopping monitoring');
           stopMonitoring();
           return;
         }
-        log('✅ User is checked in - proceeding with auto checkout');
       } catch (e) {
         log('⚠️ Could not verify attendance status: $e');
         // Continue with auto checkout anyway
@@ -483,7 +488,7 @@ class AutoCheckoutService {
           latitude: currentPosition.latitude.toString(),
           longitude: currentPosition.longitude.toString(),
           address: address,
-          imagePath: '', // No image for auto checkout
+          imagePath: null, // No image for auto checkout
           siteId: null,
         );
         log('✅ API call successful');
@@ -517,6 +522,9 @@ class AutoCheckoutService {
           'Auto checkout: You moved outside the site range (${_checkInSite?.name ?? "Unknown site"})',
         );
         log('✅ Notification shown to user');
+        
+        // Reload home screen data to update attendance status
+        _reloadHomeScreen();
       }
 
       log('🎉 Auto checkout completed successfully');
@@ -813,6 +821,9 @@ class AutoCheckoutService {
               context,
               'Auto checkout: You were outside the site range when the app started (${savedSite.name})',
             );
+            
+            // Reload home screen data to update attendance status
+            _reloadHomeScreen();
           }
         } else {
           log('User is within range on app start, continuing monitoring');
@@ -888,6 +899,9 @@ class AutoCheckoutService {
               _context!,
               'Auto checkout: You moved outside the site range while the app was in background (${savedSite.name})',
             );
+            
+            // Reload home screen data to update attendance status
+            _reloadHomeScreen();
           }
         } else {
           log('❌ No context available for background auto checkout');
@@ -902,5 +916,26 @@ class AutoCheckoutService {
     }
   }
 
+  // Reload home screen data to update attendance status after auto checkout
+  void _reloadHomeScreen() {
+    try {
+      log('🔄 Reloading home screen data after auto checkout...');
+      
+      // Use the global navigator context to find the home screen
+      final context = ForegroundNotificationService.navigatorKey.currentContext;
+      if (context != null && context.mounted) {
+        // Navigate to home screen to trigger a reload
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          '/home',
+          (route) => false,
+        );
+        log('✅ Home screen reloaded successfully');
+      } else {
+        log('❌ No context available for home screen reload');
+      }
+    } catch (e) {
+      log('❌ Error reloading home screen: $e');
+    }
+  }
 
 } 

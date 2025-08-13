@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:open_file/open_file.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/utils/responsive.dart';
@@ -499,11 +500,18 @@ class _PaymentDataScreenState extends State<PaymentDataScreen> {
                     const SizedBox(
                       height: 10,
                     ),
-                    CustomButton(
-                        text: "Get PaySlip",
-                        onPressed: () {
-                          downloadPDF(context, payment.payslip_pdf_url);
-                        }),
+                                                CustomButton(
+                                text: "Get PaySlip",
+                                onPressed: () {
+                                  downloadPDF(context, payment.payslip_pdf_url);
+                                }),
+                            const SizedBox(height: 8),
+                            TextButton(
+                              onPressed: () {
+                                _showFileInfo(context, payment.payslip_pdf_url);
+                              },
+                              child: const Text("Show File Info"),
+                            ),
                   ],
                 )
               : const SizedBox.shrink(),
@@ -611,22 +619,24 @@ class _PaymentDataScreenState extends State<PaymentDataScreen> {
   Future<void> downloadPDF(BuildContext context, String pSlipUrl) async {
     try {
       // Ask for permission
-      print("Pay Slip :$pSlipUrl");
+      print("Pay Slip URL: $pSlipUrl");
       bool isGranted = await requestStoragePermission();
       if (!isGranted) {
         SnackBarUtils.showError(context, "Storage permission denied");
-
         return;
       }
 
-      final fileName =
-          "NEPL_${DateFormat('yyyy-MM-dd').format(DateTime.now())}.pdf";
+      final fileName = "NEPL_${DateFormat('yyyy-MM-dd').format(DateTime.now())}.pdf";
       final downloadPath = await getDownloadDirectoryPath();
       final file = File('$downloadPath/$fileName');
+      
+      print("Download path: ${file.path}");
+      print("File will be saved as: $fileName");
 
       // Delete existing file to prevent duplicates
       if (await file.exists()) {
         await file.delete();
+        print("Deleted existing file");
       }
 
       final dio = Dio();
@@ -643,7 +653,7 @@ class _PaymentDataScreenState extends State<PaymentDataScreen> {
                 double progress = 0.0;
 
                 dio.download(
-                  "$pSlipUrl",
+                  pSlipUrl,
                   file.path,
                   onReceiveProgress: (received, total) {
                     if (total != -1) {
@@ -652,16 +662,74 @@ class _PaymentDataScreenState extends State<PaymentDataScreen> {
                       });
                     }
                   },
-                ).then((_) {
+                ).then((_) async {
                   Navigator.of(context).pop();
-                  final message = Platform.isAndroid
-                      ? "Downloaded to Downloads folder"
-                      : "Downloaded to app documents folder";
-                  SnackBarUtils.showSuccess(context, message);
+                  
+                  // Verify file was actually downloaded
+                  if (await file.exists()) {
+                    final fileSize = await file.length();
+                    print("File downloaded successfully. Size: ${fileSize} bytes");
+                    print("File path: ${file.path}");
+                    
+                    // Try to copy to public Downloads folder
+                    String publicPath = await _copyToPublicDownloads(file, fileName);
+                    
+                    // Show success dialog with option to open file
+                    if (context.mounted) {
+                      showDialog(
+                        context: context,
+                        builder: (BuildContext dialogContext) {
+                          return AlertDialog(
+                            title: const Text("Download Successful"),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text("PDF downloaded successfully (${fileSize} bytes)"),
+                                const SizedBox(height: 8),
+                                if (publicPath != file.path) ...[
+                                  const Text("✅ File saved to Downloads folder", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
+                                  const SizedBox(height: 4),
+                                  const Text("You can find it in your device's Downloads folder"),
+                                ] else ...[
+                                  const Text("⚠️ File saved to app folder", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange)),
+                                  const SizedBox(height: 4),
+                                  const Text("Use 'Open File' to view the PDF"),
+                                ],
+                                const SizedBox(height: 8),
+                                Text("File: $fileName", style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                              ],
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(dialogContext).pop(),
+                                child: const Text("OK"),
+                              ),
+                              ElevatedButton(
+                                onPressed: () {
+                                  Navigator.of(dialogContext).pop();
+                                  if (context.mounted) {
+                                    _openDownloadedFile(publicPath);
+                                  }
+                                },
+                                child: const Text("Open File"),
+                              ),
+                            ],
+                          );
+                        },
+                      );
+                    } else {
+                      // If context is not mounted, show a simple snackbar
+                      SnackBarUtils.showSuccess(context, "PDF downloaded successfully ($fileSize bytes)");
+                    }
+                  } else {
+                    print("File download failed - file doesn't exist");
+                    SnackBarUtils.showError(context, "Download failed - file not found");
+                  }
                 }).catchError((e) {
                   Navigator.of(context).pop();
-                  SnackBarUtils.showError(context, "Download failed");
                   print("Download error: $e");
+                  SnackBarUtils.showError(context, "Download failed: ${e.toString()}");
                 });
 
                 return Column(
@@ -678,7 +746,7 @@ class _PaymentDataScreenState extends State<PaymentDataScreen> {
         },
       );
     } catch (e) {
-      SnackBarUtils.showError(context, "Error occurred $e");
+      SnackBarUtils.showError(context, "Error occurred: $e");
       print("❌ Error: $e");
     }
   }
@@ -695,17 +763,46 @@ class _PaymentDataScreenState extends State<PaymentDataScreen> {
           if (!await downloadsDir.exists()) {
             await downloadsDir.create(recursive: true);
           }
+          print('Android Downloads path: $downloadsPath');
           return downloadsPath;
         }
       } catch (e) {
         print('Error accessing external storage: $e');
       }
+      
+      // Try alternative Downloads path
+      try {
+        final downloadsPath = '/storage/emulated/0/Download';
+        final downloadsDir = Directory(downloadsPath);
+        if (await downloadsDir.exists()) {
+          print('Android alternative Downloads path: $downloadsPath');
+          return downloadsPath;
+        }
+      } catch (e) {
+        print('Error accessing alternative Downloads path: $e');
+      }
+      
+      // Try using the public Downloads directory
+      try {
+        final downloadsPath = '/storage/emulated/0/Download';
+        final downloadsDir = Directory(downloadsPath);
+        if (!await downloadsDir.exists()) {
+          await downloadsDir.create(recursive: true);
+        }
+        print('Android public Downloads path: $downloadsPath');
+        return downloadsPath;
+      } catch (e) {
+        print('Error creating public Downloads directory: $e');
+      }
+      
       // Fallback to app documents directory
       final appDir = await getApplicationDocumentsDirectory();
+      print('Android fallback path: ${appDir.path}');
       return appDir.path;
     } else {
       // For iOS, use the documents directory
       final documentsDir = await getApplicationDocumentsDirectory();
+      print('iOS documents path: ${documentsDir.path}');
       return documentsDir.path;
     }
   }
@@ -717,5 +814,238 @@ class _PaymentDataScreenState extends State<PaymentDataScreen> {
     }
     // iOS doesn't need storage permission for app documents directory
     return true;
+  }
+
+  Future<void> _openDownloadedFile(String filePath) async {
+    if (!context.mounted) return;
+    
+    try {
+      final result = await OpenFile.open(filePath);
+      if (result.type != ResultType.done) {
+        if (context.mounted) {
+          SnackBarUtils.showError(context, "Could not open file: ${result.message}");
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        SnackBarUtils.showError(context, "Error opening file: $e");
+      }
+      print("Error opening file: $e");
+    }
+  }
+
+  Future<void> _showFileInfo(BuildContext context, String pSlipUrl) async {
+    try {
+      final fileName = "NEPL_${DateFormat('yyyy-MM-dd').format(DateTime.now())}.pdf";
+      final downloadPath = await getDownloadDirectoryPath();
+      final file = File('$downloadPath/$fileName');
+      
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text("File Information"),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("URL: $pSlipUrl"),
+                const SizedBox(height: 8),
+                Text("Download Path: $downloadPath"),
+                const SizedBox(height: 8),
+                Text("File Name: $fileName"),
+                const SizedBox(height: 8),
+                Text("Full Path: ${file.path}"),
+                const SizedBox(height: 8),
+                FutureBuilder<bool>(
+                  future: file.exists(),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData) {
+                      return Text("File Exists: ${snapshot.data}");
+                    }
+                    return const Text("Checking file existence...");
+                  },
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text("Close"),
+              ),
+            ],
+          );
+        },
+      );
+    } catch (e) {
+      SnackBarUtils.showError(context, "Error getting file info: $e");
+    }
+  }
+
+  Future<String> _copyToPublicDownloads(File sourceFile, String fileName) async {
+    if (Platform.isAndroid) {
+      try {
+        // Try to copy to public Downloads folder
+        final publicDownloadsPath = '/storage/emulated/0/Download';
+        final publicDownloadsDir = Directory(publicDownloadsPath);
+        
+        if (!await publicDownloadsDir.exists()) {
+          await publicDownloadsDir.create(recursive: true);
+        }
+        
+        final publicFile = File('$publicDownloadsPath/$fileName');
+        
+        // Delete existing file if it exists
+        if (await publicFile.exists()) {
+          await publicFile.delete();
+        }
+        
+        // Copy the file
+        await sourceFile.copy(publicFile.path);
+        print("File copied to public Downloads: ${publicFile.path}");
+        
+        // Verify the copy was successful
+        if (await publicFile.exists()) {
+          final originalSize = await sourceFile.length();
+          final copiedSize = await publicFile.length();
+          print("Original size: $originalSize, Copied size: $copiedSize");
+          
+          if (originalSize == copiedSize) {
+            return publicFile.path;
+          }
+        }
+      } catch (e) {
+        print("Error copying to public Downloads: $e");
+      }
+    }
+    
+    // Return original path if copy failed or not Android
+    return sourceFile.path;
+  }
+
+  Future<void> _openDownloadsFolder() async {
+    if (!context.mounted) return;
+    
+    try {
+      // Try multiple approaches to open Downloads folder
+      List<String> possiblePaths = [
+        '/storage/emulated/0/Download',
+        '/storage/emulated/0/Downloads',
+        '/sdcard/Download',
+        '/sdcard/Downloads',
+      ];
+      
+      bool opened = false;
+      for (String path in possiblePaths) {
+        try {
+          final directory = Directory(path);
+          if (await directory.exists()) {
+            print("Trying to open Downloads folder: $path");
+            final result = await OpenFile.open(path);
+            if (result.type == ResultType.done) {
+              opened = true;
+              print("Successfully opened Downloads folder: $path");
+              break;
+            } else {
+              print("Failed to open $path: ${result.message}");
+            }
+          }
+        } catch (e) {
+          print("Error trying path $path: $e");
+        }
+      }
+      
+      if (!opened) {
+        // Try using the system file manager
+        try {
+          final result = await OpenFile.open('content://com.android.externalstorage.documents/document/primary:Download');
+          if (result.type != ResultType.done) {
+            if (context.mounted) {
+              SnackBarUtils.showError(context, "Could not open Downloads folder. Please check your file manager manually.");
+            }
+          }
+        } catch (e) {
+          if (context.mounted) {
+            SnackBarUtils.showError(context, "Could not open Downloads folder. Please check your file manager manually.");
+          }
+          print("Error opening Downloads folder: $e");
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        SnackBarUtils.showError(context, "Error opening Downloads folder: $e");
+      }
+      print("Error opening Downloads folder: $e");
+    }
+  }
+
+  Future<void> _showFileLocationDialog(String filePath, String fileName) async {
+    if (!context.mounted) return;
+    
+    try {
+      final file = File(filePath);
+      final exists = await file.exists();
+      final size = exists ? await file.length() : 0;
+      
+      if (!context.mounted) return;
+      
+      showDialog(
+        context: context,
+        builder: (BuildContext dialogContext) {
+          return AlertDialog(
+            title: const Text("File Location Details"),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("File Name: $fileName"),
+                const SizedBox(height: 8),
+                Text("Full Path: $filePath"),
+                const SizedBox(height: 8),
+                Text("File Exists: ${exists ? 'Yes' : 'No'}"),
+                if (exists) ...[
+                  const SizedBox(height: 8),
+                  Text("File Size: ${size} bytes"),
+                ],
+                const SizedBox(height: 16),
+                const Text(
+                  "To find this file manually:",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                const Text("1. Open your device's File Manager"),
+                const Text("2. Navigate to 'Downloads' folder"),
+                Text("3. Look for the file: $fileName"),
+                const SizedBox(height: 8),
+                const Text(
+                  "Note: If you can't see the file, it might be in the app's private folder.",
+                  style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text("Close"),
+              ),
+              if (exists)
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop();
+                    if (context.mounted) {
+                      _openDownloadedFile(filePath);
+                    }
+                  },
+                  child: const Text("Open File"),
+                ),
+            ],
+          );
+        },
+      );
+    } catch (e) {
+      if (context.mounted) {
+        SnackBarUtils.showError(context, "Error showing file location: $e");
+      }
+    }
   }
 }

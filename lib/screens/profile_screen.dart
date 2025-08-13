@@ -6,8 +6,10 @@ import '../providers/user_provider.dart';
 import '../services/api_service.dart';
 import '../core/utils/snackbar_utils.dart';
 import '../core/utils/navigation_utils.dart';
+import '../core/utils/site_validation_utils.dart';
 import 'edit_profile_screen.dart';
 import 'viewer/full_screen_image_viewer.dart';
+import '../models/site.dart';
 
 class ProfileScreen extends StatefulWidget {
   final int userId;
@@ -383,17 +385,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   color: Colors.black87,
                 ),
               ),
-              Text(
-                "+ Add or Remove",
-                style: AppTypography.labelMedium.copyWith(
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.primary,
+              if (SiteValidationUtils.canManageUsers(context))
+                GestureDetector(
+                  onTap: () => _showSiteAssignmentBottomSheet(),
+                  child: Text(
+                    "+ Add or Remove",
+                    style: AppTypography.labelMedium.copyWith(
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.primary,
+                    ),
+                  ),
                 ),
-              )
             ],
           ),
           const SizedBox(height: 16),
-          ...sites.map((site) => _buildSiteCard(site)).toList(),
+          // Make sites list scrollable if more than 4 sites
+          sites.length > 4
+              ? SizedBox(
+                  height: 280, // Fixed height for scrollable area
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: sites.length,
+                    itemBuilder: (context, index) {
+                      return _buildSiteCard(sites[index]);
+                    },
+                  ),
+                )
+              : Column(
+                  children: sites.map((site) => _buildSiteCard(site)).toList(),
+                ),
         ],
       ),
     );
@@ -631,6 +652,351 @@ class _ProfileScreenState extends State<ProfileScreen> {
             site['address'] ?? 'N/A',
             style: AppTypography.bodySmall.copyWith(
               color: Colors.grey.shade600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showSiteAssignmentBottomSheet() async {
+    try {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final user = userProvider.user;
+      if (user == null) return;
+
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+
+      // Fetch all sites
+      final apiService = ApiService();
+      final allSitesResponse = await apiService.getAllSites(
+        context: context,
+        apiToken: user.data.apiToken,
+      );
+
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      if (allSitesResponse == null || allSitesResponse['data'] == null) {
+        SnackBarUtils.showError(context, 'Failed to load sites');
+        return;
+      }
+
+      final allSites = (allSitesResponse['data'] as List)
+          .map((site) => Site.fromJson(site))
+          .toList();
+
+      // Get current assigned site IDs
+      final currentSites = _profileData!['sites'] as List<dynamic>? ?? [];
+      final assignedSiteIds = currentSites.map((site) => site['id'] as int).toSet();
+
+      // Show bottom sheet
+      if (context.mounted) {
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (context) => _SiteAssignmentBottomSheet(
+            allSites: allSites,
+            assignedSiteIds: assignedSiteIds,
+            userId: widget.userId,
+            onSitesUpdated: () {
+              // Refresh profile data after site assignment changes
+              _loadProfileData();
+            },
+          ),
+        );
+      }
+    } catch (e) {
+      // Close loading dialog if still open
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+      SnackBarUtils.showError(context, 'Error loading sites: $e');
+    }
+  }
+}
+
+class _SiteAssignmentBottomSheet extends StatefulWidget {
+  final List<Site> allSites;
+  final Set<int> assignedSiteIds;
+  final int userId;
+  final VoidCallback onSitesUpdated;
+
+  const _SiteAssignmentBottomSheet({
+    required this.allSites,
+    required this.assignedSiteIds,
+    required this.userId,
+    required this.onSitesUpdated,
+  });
+
+  @override
+  State<_SiteAssignmentBottomSheet> createState() => _SiteAssignmentBottomSheetState();
+}
+
+class _SiteAssignmentBottomSheetState extends State<_SiteAssignmentBottomSheet> {
+  Set<int> _selectedSiteIds = {};
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedSiteIds = Set.from(widget.assignedSiteIds);
+  }
+
+  Future<void> _saveSiteAssignments() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final user = userProvider.user;
+      if (user == null) return;
+
+      // Determine sites to assign and detach
+      final sitesToAssign = _selectedSiteIds.difference(widget.assignedSiteIds);
+      final sitesToDetach = widget.assignedSiteIds.difference(_selectedSiteIds);
+
+      if (sitesToAssign.isEmpty && sitesToDetach.isEmpty) {
+        Navigator.of(context).pop();
+        return;
+      }
+
+      final apiService = ApiService();
+      await apiService.editOtherUserProfile(
+        context: context,
+        apiToken: user.data.apiToken,
+        userId: widget.userId.toString(),
+        siteIds: sitesToAssign.isNotEmpty ? sitesToAssign.join(',') : null,
+        detachSiteIds: sitesToDetach.isNotEmpty ? sitesToDetach.join(',') : null,
+      );
+
+      if (context.mounted) {
+        Navigator.of(context).pop();
+        SnackBarUtils.showSuccess(context, 'Site assignments updated successfully');
+        widget.onSitesUpdated();
+      }
+    } catch (e) {
+      if (context.mounted) {
+        SnackBarUtils.showError(context, 'Failed to update site assignments: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.8,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
+      ),
+      child: Column(
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Manage Site Assignments',
+                    style: AppTypography.titleLarge.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+          ),
+          
+          // Search bar
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: TextField(
+              decoration: InputDecoration(
+                hintText: 'Search sites...',
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.primary),
+                ),
+                filled: true,
+                fillColor: Colors.grey.shade50,
+              ),
+              onChanged: (value) {
+                // TODO: Implement search functionality
+              },
+            ),
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Sites list
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              itemCount: widget.allSites.length,
+              itemBuilder: (context, index) {
+                final site = widget.allSites[index];
+                final isAssigned = _selectedSiteIds.contains(site.id);
+                
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isAssigned ? AppColors.primary.withOpacity(0.05) : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isAssigned ? AppColors.primary : Colors.grey.shade200,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      // Site info
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              site.name,
+                              style: AppTypography.bodyMedium.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              site.address,
+                              style: AppTypography.bodySmall.copyWith(
+                                color: Colors.grey.shade600,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      
+                      // Assignment button
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            if (isAssigned) {
+                              _selectedSiteIds.remove(site.id);
+                            } else {
+                              _selectedSiteIds.add(site.id);
+                            }
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isAssigned ? Colors.red : AppColors.primary,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            isAssigned ? 'Remove' : 'Assign',
+                            style: AppTypography.bodySmall.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          
+          // Bottom actions
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${_selectedSiteIds.length} sites selected',
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                ElevatedButton(
+                  onPressed: _isLoading ? null : _saveSiteAssignments,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Text('Save Changes'),
+                ),
+              ],
             ),
           ),
         ],

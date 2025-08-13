@@ -135,10 +135,24 @@ class ApiService {
     } catch (e) {
       if (e is ApiException) rethrow;
       log("E == $e");
-      throw ApiException(
-        'An unexpected error occurred. Please try again.',
-        statusCode: 0,
-      );
+      
+      // Provide more specific error messages
+      if (e.toString().contains('PathNotFoundException')) {
+        throw ApiException(
+          'File path error. Please try again.',
+          statusCode: 0,
+        );
+      } else if (e.toString().contains('FileSystemException')) {
+        throw ApiException(
+          'File system error. Please try again.',
+          statusCode: 0,
+        );
+      } else {
+        throw ApiException(
+          'An unexpected error occurred. Please try again.',
+          statusCode: 0,
+        );
+      }
     }
   }
 
@@ -349,8 +363,16 @@ class ApiService {
       request.fields['address'] = address;
       if (siteId != null) request.fields['site_id'] = siteId.toString();
       if (checkInDescription != null) request.fields['check_in_description'] = checkInDescription;
-      if (imagePath != null) {
-        request.files.add(await http.MultipartFile.fromPath('image', imagePath));
+      if (imagePath != null && imagePath.isNotEmpty) {
+        try {
+          final file = File(imagePath);
+          if (await file.exists()) {
+            request.files.add(await http.MultipartFile.fromPath('image', imagePath));
+          }
+        } catch (e) {
+          print('Error adding image file: $e');
+          // Continue without image if file doesn't exist
+        }
       }
       var streamedResponse = await request.send();
       var response = await http.Response.fromStream(streamedResponse);
@@ -788,6 +810,42 @@ class ApiService {
       if (e is ApiException) rethrow;
       throw ApiException('An unexpected error occurred. Please try again. $e');
     }
+  }
+
+  Future<Map<String, dynamic>?> getAllSites({
+    required BuildContext context,
+    required String apiToken,
+  }) async {
+    return _handleNetworkCall(() async {
+      final response = await http.post(
+        Uri.parse('$baseUrl/getAllSite'),
+        body: {
+          'api_token': apiToken,
+        },
+      );
+      return _handleResponse(response, context);
+    });
+  }
+
+  Future<Map<String, dynamic>?> editOtherUserProfile({
+    required BuildContext context,
+    required String apiToken,
+    required String userId,
+    String? siteIds,
+    String? detachSiteIds,
+  }) async {
+    return _handleNetworkCall(() async {
+      final response = await http.post(
+        Uri.parse('$baseUrl/editOtherUserProfile'),
+        body: {
+          'api_token': apiToken,
+          'user_id': userId,
+          if (siteIds != null) 'site_ids': siteIds,
+          if (detachSiteIds != null) 'detach_site_ids': detachSiteIds,
+        },
+      );
+      return _handleResponse(response, context);
+    });
   }
 
   Future<void> createSite({

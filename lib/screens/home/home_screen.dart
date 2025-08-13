@@ -972,6 +972,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     padding: EdgeInsets.zero,
                     children: [
                       DrawerHeader(
+
                         decoration: const BoxDecoration(
                           color: AppColors.primary,
                         ),
@@ -997,7 +998,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               user?.data.name ?? 'User',
                               style: AppTypography.titleLarge.copyWith(
                                 color: Colors.white,
-                                fontSize: Responsive.responsiveValue(context: context, mobile: 18, tablet: 28),
+                                fontSize: Responsive.responsiveValue(context: context, mobile: 16, tablet: 28),
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -1006,7 +1007,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               user?.data.email ?? '',
                               style: AppTypography.bodyMedium.copyWith(
                                 color: Colors.white.withOpacity(0.9),
-                                fontSize: Responsive.responsiveValue(context: context, mobile: 14, tablet: 20),
+                                fontSize: Responsive.responsiveValue(context: context, mobile: 12, tablet: 20),
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -1024,7 +1025,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           ));
                         },
                       ),
-
                       ListTile(
                         leading: const Icon(Icons.lock_outline),
                         title: const Text('Change Password'),
@@ -1040,6 +1040,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           NavigationUtils.pop(context);
                         },
                       ),
+
+
                       // if(userProvider.user!.data.id == 1 || userProvider.user!.data.id == 9) ListTile(
                       //   leading: const Icon(Icons.analytics_outlined),
                       //   title: const Text('Auto Checkout Logs'),
