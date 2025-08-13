@@ -700,14 +700,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
       // Handle auto checkout monitoring (only after successful API call)
       if (type == 'check_in' && selectedSite != null) {
-        // Start auto checkout monitoring for check-in (delayed to avoid interference)
-        final site = selectedSite; // Capture the non-null value
-        Future.delayed(const Duration(seconds: 3), () {
-          if (mounted) {
-            AutoCheckoutService.instance.startMonitoring(context, site);
-            SnackBarUtils.showInfo(context, 'Auto checkout enabled. You will be automatically checked out if you move outside the site range.');
-          }
-        });
+        // Only start auto checkout monitoring for non-exempted users
+        if (!isExempted) {
+          // Start auto checkout monitoring for check-in (delayed to avoid interference)
+          final site = selectedSite; // Capture the non-null value
+          Future.delayed(const Duration(seconds: 3), () {
+            if (mounted) {
+              AutoCheckoutService.instance.startMonitoring(context, site);
+              SnackBarUtils.showInfo(context, 'Auto checkout enabled. You will be automatically checked out if you move outside the site range.');
+            }
+          });
+        } else {
+          // For exempted users, show different message
+          SnackBarUtils.showInfo(context, 'Check-in successful. Auto checkout is disabled for exempted users.');
+        }
       } else if (type == 'check_out') {
         // Stop auto checkout monitoring for check-out
         AutoCheckoutService.instance.stopMonitoring();
@@ -966,6 +972,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     padding: EdgeInsets.zero,
                     children: [
                       DrawerHeader(
+
                         decoration: const BoxDecoration(
                           color: AppColors.primary,
                         ),
@@ -991,7 +998,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               user?.data.name ?? 'User',
                               style: AppTypography.titleLarge.copyWith(
                                 color: Colors.white,
-                                fontSize: Responsive.responsiveValue(context: context, mobile: 18, tablet: 28),
+                                fontSize: Responsive.responsiveValue(context: context, mobile: 16, tablet: 28),
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -1000,7 +1007,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               user?.data.email ?? '',
                               style: AppTypography.bodyMedium.copyWith(
                                 color: Colors.white.withOpacity(0.9),
-                                fontSize: Responsive.responsiveValue(context: context, mobile: 14, tablet: 20),
+                                fontSize: Responsive.responsiveValue(context: context, mobile: 12, tablet: 20),
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -1013,10 +1020,11 @@ class _HomeScreenState extends State<HomeScreen> {
                         title: const Text('Profile'),
                         onTap: () {
                           NavigationUtils.pop(context);
-                          NavigationUtils.push(context, const ProfileScreen());
+                          NavigationUtils.push(context,  ProfileScreen(
+                            userId: user!.data.id,
+                          ));
                         },
                       ),
-
                       ListTile(
                         leading: const Icon(Icons.lock_outline),
                         title: const Text('Change Password'),
@@ -1032,6 +1040,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           NavigationUtils.pop(context);
                         },
                       ),
+
+
                       // if(userProvider.user!.data.id == 1 || userProvider.user!.data.id == 9) ListTile(
                       //   leading: const Icon(Icons.analytics_outlined),
                       //   title: const Text('Auto Checkout Logs'),
@@ -1170,6 +1180,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         icon: 'assets/images/marketing.png',
                         label: 'Marketing',
                         onTap: () {},
+                      ),
+                      _buildQuickActionButton(
+                        icon: 'assets/images/setting.png',
+                        label: 'Admin Logs',
+                        onTap: () {
+                          NavigationUtils.push(context, const AutoCheckoutLogsScreen());
+                        },
                       ),
 
                     ],

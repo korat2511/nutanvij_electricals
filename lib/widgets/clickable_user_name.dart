@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/utils/navigation_utils.dart';
 import '../models/task.dart';
-import '../screens/user_profile_screen.dart';
+import '../screens/profile_screen.dart';
 import '../core/theme/app_colors.dart';
 
 class ClickableUserName extends StatelessWidget {
@@ -22,7 +22,9 @@ class ClickableUserName extends StatelessWidget {
       onTap: () {
         NavigationUtils.push(
           context,
-          UserProfileScreen(user: user),
+           ProfileScreen(
+            userId: user.id,
+          ),
         );
       },
       child: Text(

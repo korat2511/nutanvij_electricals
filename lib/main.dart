@@ -1,11 +1,15 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:nutanvij_electricals/screens/home/home_screen.dart';
 import 'package:nutanvij_electricals/screens/splash_screen.dart';
+import 'package:nutanvij_electricals/screens/task/task_list_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'core/utils/navigation_utils.dart';
 import 'firebase_options.dart';
 import 'providers/user_provider.dart';
+import 'screens/task/task_details_screen.dart' show TaskDetailsScreen;
 import 'services/notification_permission_service.dart';
 import 'services/foreground_notification_service.dart';
 import 'services/auto_checkout_service.dart';
@@ -42,27 +46,28 @@ void _handleNotificationNavigation(RemoteMessage message) {
   final data = message.data;
   if (data.containsKey('screen')) {
     final screen = data['screen'];
+    final context = ForegroundNotificationService.navigatorKey.currentContext;
+    
+    if (context == null) {
+      print('Context not available for navigation');
+      return;
+    }
     
     switch (screen) {
       case 'taskDetailsScreen':
         if (data.containsKey('task_id')) {
-          print('Navigate to task details: ${data['task_id']}');
-          // NavigationUtils.push(context, TaskDetailsScreen(taskId: data['task_id']));
+          NavigationUtils.push(context, TaskDetailsScreen(taskId: data['task_id']));
         }
         break;
-      case 'siteDetailsScreen':
+      case 'taskListScreen':
         if (data.containsKey('site_id')) {
           print('Navigate to site details: ${data['site_id']}');
-          // NavigationUtils.push(context, SiteDetailsScreen(siteId: data['site_id']));
+          NavigationUtils.push(context, TaskListScreen(siteId: data['site_id']));
         }
         break;
-      case 'attendanceScreen':
+      case 'homeScreen':
         print('Navigate to attendance screen');
-        // NavigationUtils.push(context, AttendanceScreen());
-        break;
-      case 'leaveScreen':
-        print('Navigate to leave screen');
-        // NavigationUtils.push(context, LeaveScreen());
+        NavigationUtils.push(context, HomeScreen());
         break;
       default:
         print('Unknown screen: $screen');

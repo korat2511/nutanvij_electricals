@@ -268,7 +268,7 @@ class AutoCheckoutService {
     );
 
     final timeSinceLastMovement = DateTime.now().difference(_lastMovementTime!);
-    final fiveMinutes = const Duration(minutes: 5);
+    const fiveMinutes = Duration(minutes: 5);
 
     log('Movement check - Distance moved: ${distanceMoved.round()}m, Time since last movement: ${timeSinceLastMovement.inMinutes}min');
 
@@ -408,6 +408,32 @@ class AutoCheckoutService {
       }
 
       log('✅ User found: ${user.data.name}');
+      
+      // Get context for API calls
+      final context = _context ?? ForegroundNotificationService.navigatorKey.currentContext;
+      if (context == null) {
+        throw Exception('No context available for API call');
+      }
+      
+      // Check if user is actually checked in before attempting auto checkout
+      try {
+        final attendanceData = await ApiService().attendanceCheck(context, user.data.apiToken);
+        if (attendanceData != null && attendanceData['flag'] == 'check_out') {
+          log('✅ User is checked in (flag=check_out) - proceeding with auto checkout');
+        } else if (attendanceData != null && attendanceData['flag'] == 'check_in') {
+          log('❌ User is already checked out (flag=check_in) - stopping monitoring');
+          stopMonitoring();
+          return;
+        } else {
+          log('❌ User is not checked in - stopping monitoring');
+          stopMonitoring();
+          return;
+        }
+      } catch (e) {
+        log('⚠️ Could not verify attendance status: $e');
+        // Continue with auto checkout anyway
+      }
+      
       log('🔄 Calling API for auto checkout...');
 
       // Get current location and address for auto checkout
@@ -446,20 +472,41 @@ class AutoCheckoutService {
       
       // Get address for the current location with timeout
       final address = await _getAddressWithTimeout(currentPosition);
-
-      // Call the checkout API with actual location data
-      await ApiService().saveAttendance(
-        context: _context ?? ForegroundNotificationService.navigatorKey.currentContext!,
-        apiToken: user.data.apiToken,
-        type: 'check_out',
-        latitude: currentPosition.latitude.toString(),
-        longitude: currentPosition.longitude.toString(),
-        address: address,
-        imagePath: '', // No image for auto checkout
-        siteId: null,
-      );
-
-      log('✅ API call successful');
+      
+      try {
+        log('🔄 Making API call with data:');
+        log('  - API Token: ${user.data.apiToken.substring(0, 10)}...');
+        log('  - Type: check_out');
+        log('  - Latitude: ${currentPosition.latitude}');
+        log('  - Longitude: ${currentPosition.longitude}');
+        log('  - Address: $address');
+        
+        await ApiService().saveAttendance(
+          context: context,
+          apiToken: user.data.apiToken,
+          type: 'check_out',
+          latitude: currentPosition.latitude.toString(),
+          longitude: currentPosition.longitude.toString(),
+          address: address,
+          imagePath: null, // No image for auto checkout
+          siteId: null,
+        );
+        log('✅ API call successful');
+      } catch (apiError) {
+        log('❌ API call failed: $apiError');
+        log('❌ API error type: ${apiError.runtimeType}');
+        log('❌ API error details: ${apiError.toString()}');
+        
+        // Check if it's a specific API error
+        if (apiError.toString().contains('already checked out') || 
+            apiError.toString().contains('not checked in')) {
+          log('✅ User already checked out or not checked in - stopping monitoring');
+          stopMonitoring();
+          return; // Don't treat this as an error
+        }
+        // Re-throw other API errors
+        rethrow;
+      }
 
       // Log auto checkout success
       _logAutoCheckoutSuccess('background');
@@ -475,6 +522,9 @@ class AutoCheckoutService {
           'Auto checkout: You moved outside the site range (${_checkInSite?.name ?? "Unknown site"})',
         );
         log('✅ Notification shown to user');
+        
+        // Reload home screen data to update attendance status
+        _reloadHomeScreen();
       }
 
       log('🎉 Auto checkout completed successfully');
@@ -523,6 +573,32 @@ class AutoCheckoutService {
     _checkInSite = _checkInSite!.copyWith(maxRange: originalMaxRange);
   }
 
+  // Test auto checkout directly (bypasses all checks)
+  Future<void> testAutoCheckoutDirectly(BuildContext context) async {
+    log('🧪 Testing auto checkout directly');
+    
+    // Set context for testing
+    _context = context;
+    
+    // Create a dummy site for testing
+    final testSite = Site(
+      id: 999,
+      name: 'Test Site',
+      latitude: '21.2991211',
+      longitude: '72.9013905',
+      address: 'Test Address',
+      company: 'Test Company',
+      status: 'Active',
+      pinned: 0,
+      siteImages: [],
+      maxRange: 500,
+    );
+    _checkInSite = testSite;
+    
+    log('🔄 Testing auto checkout with dummy site');
+    await _performAutoCheckout();
+  }
+
   // Manually trigger a location check for testing
   Future<void> triggerLocationCheckForTesting() async {
     log('🧪 Manual location check for testing');
@@ -558,44 +634,9 @@ class AutoCheckoutService {
     }
   }
 
-  // Get current monitoring status for debugging
-  String getDebugStatus() {
-    return '''
-🔍 Auto Checkout Debug Status:
-- isMonitoring: $_isMonitoring
-- isTracking: $_isTracking
-- checkInSite: ${_checkInSite?.name ?? 'None'}
-- maxRange: ${_checkInSite?.maxRange ?? 'None'}
-- lastPosition: ${_lastPosition != null ? '${_lastPosition!.latitude}, ${_lastPosition!.longitude}' : 'None'}
-- lastMovementPosition: ${_lastMovementPosition != null ? '${_lastMovementPosition!.latitude}, ${_lastMovementPosition!.longitude}' : 'None'}
-- lastMovementTime: ${_lastMovementTime?.toIso8601String() ?? 'None'}
-- lastLogTime: ${_lastLogTime?.toIso8601String() ?? 'None'}
-- locationTimer: ${_locationTimer != null ? 'Active' : 'Inactive'}
-- loggingTimer: ${_loggingTimer != null ? 'Active' : 'Inactive'}
-''';
-  }
 
-  // Get monitoring status for debugging
-  Map<String, dynamic> getMonitoringStatus() {
-    return {
-      'isMonitoring': _isMonitoring,
-      'isTracking': _isTracking,
-      'checkInSite': _checkInSite?.name,
-      'maxRange': _checkInSite?.maxRange,
-      'lastPosition': _lastPosition != null ? {
-        'latitude': _lastPosition!.latitude,
-        'longitude': _lastPosition!.longitude,
-      } : null,
-      'lastMovementPosition': _lastMovementPosition != null ? {
-        'latitude': _lastMovementPosition!.latitude,
-        'longitude': _lastMovementPosition!.longitude,
-      } : null,
-      'lastMovementTime': _lastMovementTime?.toIso8601String(),
-      'lastLogTime': _lastLogTime?.toIso8601String(),
-      'trackingInterval': _isTracking ? '5 minutes' : 'stopped',
-      'loggingInterval': '5 minutes',
-    };
-  }
+
+
 
   // Helper method to get user info for logging
   Map<String, String> _getUserInfo() {
@@ -728,6 +769,17 @@ class AutoCheckoutService {
   // Check for auto checkout when app starts (called from main.dart or splash screen)
   Future<void> checkForAutoCheckoutOnAppStart(BuildContext context) async {
     try {
+      // Check if user is exempted from location checking
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final user = userProvider.user;
+      
+      if (user != null && user.data.isCheckInExmpted == 1) {
+        log('User is exempted from location checking, skipping auto checkout monitoring');
+        // Clear any existing monitoring state for exempted users
+        await _clearMonitoringState();
+        return;
+      }
+      
       // Load monitoring state from SharedPreferences
       final savedSite = await _loadMonitoringState();
       
@@ -769,6 +821,9 @@ class AutoCheckoutService {
               context,
               'Auto checkout: You were outside the site range when the app started (${savedSite.name})',
             );
+            
+            // Reload home screen data to update attendance status
+            _reloadHomeScreen();
           }
         } else {
           log('User is within range on app start, continuing monitoring');
@@ -830,18 +885,27 @@ class AutoCheckoutService {
         log('🚨 BACKGROUND AUTO CHECKOUT TRIGGERED!');
         
         // Set context for API call (use global navigator context)
-        _context = ForegroundNotificationService.navigatorKey.currentContext;
-        _checkInSite = savedSite;
-        
-        // Perform auto checkout
-        await _performAutoCheckout();
-        
-        // Show notification to user
-        if (_context != null && _context!.mounted) {
-          SnackBarUtils.showInfo(
-            _context!,
-            'Auto checkout: You moved outside the site range while the app was in background (${savedSite.name})',
-          );
+        final context = ForegroundNotificationService.navigatorKey.currentContext;
+        if (context != null) {
+          _context = context;
+          _checkInSite = savedSite;
+          
+          // Perform auto checkout
+          await _performAutoCheckout();
+          
+          // Show notification to user
+          if (_context != null && _context!.mounted) {
+            SnackBarUtils.showInfo(
+              _context!,
+              'Auto checkout: You moved outside the site range while the app was in background (${savedSite.name})',
+            );
+            
+            // Reload home screen data to update attendance status
+            _reloadHomeScreen();
+          }
+        } else {
+          log('❌ No context available for background auto checkout');
+          _logAutoCheckoutError('No context available for background auto checkout', 'background');
         }
       } else {
         log('User is within range in background - continuing monitoring');
@@ -852,5 +916,26 @@ class AutoCheckoutService {
     }
   }
 
+  // Reload home screen data to update attendance status after auto checkout
+  void _reloadHomeScreen() {
+    try {
+      log('🔄 Reloading home screen data after auto checkout...');
+      
+      // Use the global navigator context to find the home screen
+      final context = ForegroundNotificationService.navigatorKey.currentContext;
+      if (context != null && context.mounted) {
+        // Navigate to home screen to trigger a reload
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          '/home',
+          (route) => false,
+        );
+        log('✅ Home screen reloaded successfully');
+      } else {
+        log('❌ No context available for home screen reload');
+      }
+    } catch (e) {
+      log('❌ Error reloading home screen: $e');
+    }
+  }
 
 } 
