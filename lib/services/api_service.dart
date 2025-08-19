@@ -18,6 +18,7 @@ import '../models/payment_data.dart';
 import 'package:file_picker/file_picker.dart';
 import '../models/tag.dart';
 import '../models/reimbursement_data.dart';
+import '../models/manpower.dart';
 
 class ApiException implements Exception {
   final String message;
@@ -1310,7 +1311,6 @@ class ApiService {
     request.fields['api_token'] = apiToken;
     request.fields['task_id'] = taskId.toString();
     request.fields['work_done'] = workDone;
-    request.fields['work_left'] = workLeft;
     request.fields['unit'] = unit;
     if (remark != null && remark.isNotEmpty) {
       request.fields['remark'] = remark;
@@ -1331,9 +1331,11 @@ class ApiService {
       }
     }
 
+    log("Request == ${request.fields}");
+
     final streamedResponse = await request.send();
     final response = await http.Response.fromStream(streamedResponse);
-
+    log("Request == ${response.statusCode}");
     final data = _handleResponse(response, null);
     return data;
   }
@@ -1531,6 +1533,110 @@ class ApiService {
       } catch (e) {
         // Re-throw the actual error for proper debugging
         rethrow;
+      }
+    });
+  }
+
+  // Manpower Management APIs
+  Future<Manpower?> getManPower({
+    required BuildContext context,
+    required String apiToken,
+    required int siteId,
+    required String date,
+  }) async {
+    return _handleNetworkCall(() async {
+      final response = await http.post(
+        Uri.parse('$baseUrl/getManPower'),
+        body: {
+          'api_token': apiToken,
+          'site_id': siteId.toString(),
+          'date': date,
+        },
+      );
+      final data = _handleResponse(response, context);
+      
+      // Check if data exists, return null if no data found
+      if (data['data'] == null || data['data'] == '') {
+        return null;
+      }
+      
+      try {
+        return Manpower.fromJson(data['data']);
+      } catch (e) {
+        log('Error parsing manpower data: $e');
+        log('Data received: ${data['data']}');
+        throw ApiException('Invalid data format received from server', statusCode: 500);
+      }
+    });
+  }
+
+  Future<ManpowerReport> getManPowerReport({
+    required BuildContext context,
+    required String apiToken,
+    required int siteId,
+    required String startDate,
+    required String endDate,
+  }) async {
+    return _handleNetworkCall(() async {
+      final response = await http.post(
+        Uri.parse('$baseUrl/manpowerReport'),
+        body: {
+          'api_token': apiToken,
+          'site_id': siteId.toString(),
+          'start_date': startDate,
+          'end_date': endDate,
+        },
+      );
+      final data = _handleResponse(response, context);
+      
+      // Handle case where data might be null or empty
+      if (data['data'] == null || data['data'] == '' || (data['data'] is List && (data['data'] as List).isEmpty)) {
+        return ManpowerReport(data: [], message: data['message'] ?? 'No data found');
+      }
+      
+      try {
+        return ManpowerReport.fromJson(data);
+      } catch (e) {
+        log('Error parsing manpower report data: $e');
+        log('Data received: ${data['data']}');
+        throw ApiException('Invalid data format received from server', statusCode: 500);
+      }
+    });
+  }
+
+  Future<Manpower> storeManPower({
+    required BuildContext context,
+    required String apiToken,
+    required int siteId,
+    required String date,
+    required int skillWorker,
+    required int unskillWorker,
+    required int shift,
+    required double skillPayPerHead,
+    required double unskillPayPerHead,
+  }) async {
+    return _handleNetworkCall(() async {
+      final response = await http.post(
+        Uri.parse('$baseUrl/storeManPower'),
+        body: {
+          'api_token': apiToken,
+          'site_id': siteId.toString(),
+          'date': date,
+          'skill_worker': skillWorker.toString(),
+          'unskill_worker': unskillWorker.toString(),
+          'shift': shift.toString(),
+          'skill_pay_per_head': skillPayPerHead.toString(),
+          'unskill_pay_per_head': unskillPayPerHead.toString(),
+        },
+      );
+      final data = _handleResponse(response, context);
+      
+      try {
+        return Manpower.fromJson(data['data']);
+      } catch (e) {
+        log('Error parsing stored manpower data: $e');
+        log('Data received: ${data['data']}');
+        throw ApiException('Invalid data format received from server', statusCode: 500);
       }
     });
   }

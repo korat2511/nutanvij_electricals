@@ -14,6 +14,7 @@ import '../../../widgets/custom_search_field.dart';
 import 'assigned_users_screen.dart';
 import 'create_site_screen.dart';
 import 'edit_site_screen.dart';
+import 'manpower_management_screen.dart';
 import '../../core/utils/navigation_utils.dart';
 import '../../../core/utils/site_validation_utils.dart';
 import '../../../core/utils/snackbar_utils.dart';
@@ -117,10 +118,18 @@ class _SiteListScreenState extends State<SiteListScreen> {
       final sitesWithUsers = await Future.wait(futures);
 
       setState(() {
-        _sites.addAll(sitesWithUsers);
-        _filteredSites.addAll(sitesWithUsers);
+        // Check for duplicates before adding
+        int addedCount = 0;
+        for (final newSite in sitesWithUsers) {
+          if (!_sites.any((existingSite) => existingSite.id == newSite.id)) {
+            _sites.add(newSite);
+            _filteredSites.add(newSite);
+            addedCount++;
+          }
+        }
         _currentPage++;
-        _hasMoreData = sites.isNotEmpty;
+        // Only continue pagination if we actually added new sites
+        _hasMoreData = addedCount > 0 && sites.isNotEmpty;
         _isLoadingMore = false;
       });
     } catch (e) {
@@ -180,10 +189,15 @@ class _SiteListScreenState extends State<SiteListScreen> {
         onMenuPressed: () => NavigationUtils.pop(context),
         title: 'Sites',
       ),
-      body: Column(
-        children: [
-          // Search Bar
-          Padding(
+      body: GestureDetector(
+        onTap: () {
+          // Close keyboard when tapping outside
+          FocusScope.of(context).unfocus();
+        },
+        child: Column(
+          children: [
+            // Search Bar
+            Padding(
             padding: const EdgeInsets.all(16.0),
             child: CustomSearchField(
               controller: _searchController,
@@ -336,23 +350,26 @@ class _SiteListScreenState extends State<SiteListScreen> {
                   ),
                 ],
               ),
-              floatingActionButton: canCreateSite
-          ? Padding(
-              padding: const EdgeInsets.only(bottom: 16.0, right: 8.0),
-              child: CustomButton(
-                text: 'Create Site',
-                width: 160,
-                height: 48,
-                onPressed: () async {
-                  final shouldRefresh = await NavigationUtils.push(context, CreateSiteScreen());
-                  if (shouldRefresh == true) {
-                    _loadSites();
-                  }
-                },
-              ),
-            )
-          : null,
-    );
+            ),
+
+
+        floatingActionButton: canCreateSite
+            ? Padding(
+                padding: const EdgeInsets.only(bottom: 16.0, right: 8.0),
+                child: CustomButton(
+                  text: 'Create Site',
+                  width: 160,
+                  height: 48,
+                  onPressed: () async {
+                    final shouldRefresh = await NavigationUtils.push(context, CreateSiteScreen());
+                    if (shouldRefresh == true) {
+                      _loadSites();
+                    }
+                  },
+                ),
+              )
+            : null,
+      );
   }
 }
 
@@ -525,6 +542,11 @@ class _SiteCardState extends State<_SiteCard> {
                               final parentState = context.findAncestorStateOfType<_SiteListScreenState>();
                               parentState?._loadSites();
                             }
+                          } else if (value == 'manpower') {
+                            NavigationUtils.push(
+                              context,
+                              ManpowerManagementScreen(site: site),
+                            );
                           } else if (value == 'details') {
                             // TODO: Implement view details
                           } else if (value == 'pin') {
@@ -552,7 +574,10 @@ class _SiteCardState extends State<_SiteCard> {
                             value: 'edit',
                             child: Text('Edit Site'),
                           ),
-
+                          const PopupMenuItem(
+                            value: 'manpower',
+                            child: Text('Manage Manpower'),
+                          ),
                           const PopupMenuItem(
                             value: 'details',
                             child: Text('View Details'),

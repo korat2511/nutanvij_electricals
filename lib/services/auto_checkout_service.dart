@@ -206,7 +206,7 @@ class AutoCheckoutService {
       // Get current position with timeout and lower accuracy for faster response
       final currentPosition = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.low, // Use low accuracy for faster response
-        timeLimit: const Duration(seconds: 10), // Reduced timeout
+        timeLimit: const Duration(seconds: 8), // Shorter timeout to avoid blocking
       );
 
       log('Current position obtained: ${currentPosition.latitude}, ${currentPosition.longitude}');
@@ -417,7 +417,12 @@ class AutoCheckoutService {
       
       // Check if user is actually checked in before attempting auto checkout
       try {
-        final attendanceData = await ApiService().attendanceCheck(context, user.data.apiToken);
+        final attendanceData = await ApiService().attendanceCheck(context, user.data.apiToken)
+            .timeout(const Duration(seconds: 5), onTimeout: () {
+          log('⚠️ Attendance check timeout, proceeding with auto checkout');
+          return null;
+        });
+        
         if (attendanceData != null && attendanceData['flag'] == 'check_out') {
           log('✅ User is checked in (flag=check_out) - proceeding with auto checkout');
         } else if (attendanceData != null && attendanceData['flag'] == 'check_in') {
@@ -431,7 +436,7 @@ class AutoCheckoutService {
         }
       } catch (e) {
         log('⚠️ Could not verify attendance status: $e');
-        // Continue with auto checkout anyway
+        // Continue with auto checkout anyway to ensure user gets checked out
       }
       
       log('🔄 Calling API for auto checkout...');
@@ -442,8 +447,8 @@ class AutoCheckoutService {
       Position currentPosition;
       try {
         currentPosition = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.medium, // Use medium accuracy for faster response
-          timeLimit: const Duration(seconds: 15), // Increased timeout
+          desiredAccuracy: LocationAccuracy.low, // Use low accuracy for faster response
+          timeLimit: const Duration(seconds: 8), // Shorter timeout to avoid blocking
         );
         log('✅ Current position obtained: ${currentPosition.latitude}, ${currentPosition.longitude}');
       } catch (e) {
@@ -490,7 +495,9 @@ class AutoCheckoutService {
           address: address,
           imagePath: null, // No image for auto checkout
           siteId: null,
-        );
+        ).timeout(const Duration(seconds: 10), onTimeout: () {
+          throw TimeoutException('API call timeout after 10 seconds');
+        });
         log('✅ API call successful');
       } catch (apiError) {
         log('❌ API call failed: $apiError');
@@ -608,20 +615,21 @@ class AutoCheckoutService {
   // Get address with timeout and fallback
   Future<String> _getAddressWithTimeout(Position position) async {
     try {
+      // Use a much shorter timeout to avoid blocking auto checkout
       final placemarks = await placemarkFromCoordinates(
         position.latitude, 
         position.longitude,
       ).timeout(
-        const Duration(seconds: 8), // Shorter timeout for geocoding
+        const Duration(seconds: 3), // Much shorter timeout to avoid blocking
         onTimeout: () {
-          log('⚠️ Geocoding timeout, using fallback address');
+          log('⚠️ Geocoding timeout (3s), using fallback address');
           return [];
         },
       );
       
       if (placemarks.isNotEmpty) {
         final placemark = placemarks.first;
-        final address = '${placemark.street}, ${placemark.subLocality}, ${placemark.locality}, ${placemark.administrativeArea}';
+        final address = '${placemark.street ?? ''}, ${placemark.subLocality ?? ''}, ${placemark.locality ?? ''}, ${placemark.administrativeArea ?? ''}';
         log('✅ Address obtained: $address');
         return address;
       } else {
@@ -769,11 +777,18 @@ class AutoCheckoutService {
   // Check for auto checkout when app starts (called from main.dart or splash screen)
   Future<void> checkForAutoCheckoutOnAppStart(BuildContext context) async {
     try {
+      log('🔄 Starting app start auto checkout validation...');
+      
       // Check if user is exempted from location checking
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       final user = userProvider.user;
       
-      if (user != null && user.data.isCheckInExmpted == 1) {
+      if (user == null) {
+        log('❌ No user data available for app start validation');
+        return;
+      }
+      
+      if (user.data.isCheckInExmpted == 1) {
         log('User is exempted from location checking, skipping auto checkout monitoring');
         // Clear any existing monitoring state for exempted users
         await _clearMonitoringState();
@@ -786,10 +801,17 @@ class AutoCheckoutService {
       if (savedSite != null) {
         log('Found saved auto checkout monitoring for site: ${savedSite.name}');
         
+        // Check location permission first
+        LocationPermission permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+          log('❌ Location permission not granted for app start validation');
+          return;
+        }
+        
         // Check current location against saved site
         final currentPosition = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.medium, // Use medium accuracy for faster response
-          timeLimit: const Duration(seconds: 15), // Increased timeout
+          desiredAccuracy: LocationAccuracy.low, // Use low accuracy for faster response
+          timeLimit: const Duration(seconds: 8), // Shorter timeout to avoid blocking
         );
         
         final distance = Geolocator.distanceBetween(
@@ -864,6 +886,13 @@ class AutoCheckoutService {
       }
       
       log('Found saved monitoring for site: ${savedSite.name}');
+      
+      // Check location permission first
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        log('❌ Location permission not granted for background auto checkout');
+        return;
+      }
       
       // Get current location with lower accuracy for faster response
       final currentPosition = await Geolocator.getCurrentPosition(

@@ -411,6 +411,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Check if auto checkout monitoring should be active based on current attendance status
     _checkAutoCheckoutStatus();
+    
+    // Check for auto checkout validation when app starts (with delay to ensure data is loaded)
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) {
+        _checkAutoCheckoutOnAppStart();
+      }
+    });
   }
 
   @override
@@ -459,6 +466,17 @@ class _HomeScreenState extends State<HomeScreen> {
       // This would require storing the check-in site info, which we can implement later
       // For now, we'll just log that monitoring should be active
       log('User is checked in, auto checkout monitoring should be active');
+    }
+  }
+
+  // Check for auto checkout validation when app starts
+  Future<void> _checkAutoCheckoutOnAppStart() async {
+    try {
+      log('🔄 Checking for auto checkout validation on app start...');
+      await AutoCheckoutService.instance.checkForAutoCheckoutOnAppStart(context);
+      log('✅ Auto checkout validation completed on app start');
+    } catch (e) {
+      log('❌ Error during auto checkout validation on app start: $e');
     }
   }
 

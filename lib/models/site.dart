@@ -20,7 +20,7 @@ class Site {
   // Additional fields from API
   final int? categoryId;
   final int? minRange;
-  final int? maxRange;
+  final int? maxRange; // 500
   final int? createdBy;
   final dynamic category;
 
