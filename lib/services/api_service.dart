@@ -3,6 +3,7 @@ import 'dart:developer';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:http/http.dart' as http;
+import '../models/contractor.dart';
 import '../models/designation.dart';
 import '../models/department.dart';
 import '../models/fair_report_response.dart';
@@ -1675,6 +1676,7 @@ class ApiService {
     required int shift,
     required double skillPayPerHead,
     required double unskillPayPerHead,
+    required int contactorId
   }) async {
     return _handleNetworkCall(() async {
       final response = await http.post(
@@ -1688,6 +1690,7 @@ class ApiService {
           'shift': shift.toString(),
           'skill_pay_per_head': skillPayPerHead.toString(),
           'unskill_pay_per_head': unskillPayPerHead.toString(),
+          'contractor_id' : contactorId.toString()
         },
       );
       final data = _handleResponse(response, context);
@@ -1939,6 +1942,50 @@ class ApiService {
       throw ApiException("An unexpected error occurred. $e");
     }
   }
+
+  Future<List<Contractor>> getContractorList({
+    required BuildContext context,
+    required String apiToken,
+    required String siteId,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/getContractor'),
+        body: {
+          'api_token': apiToken,
+          'site_id': siteId,
+        },
+      );
+
+      final data = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        if (data['status'] == 1) {
+          final List list = data['data'];
+          return list.map((e) => Contractor.fromJson(e)).toList();
+        } else {
+          throw ApiException(data['message'] ?? 'Contractor loading failed');
+        }
+      } else if (response.statusCode == 401) {
+        _handleSessionExpired(context);
+        throw ApiException('Session expired');
+      } else {
+        throw ApiException(
+          'Server error occurred. Please try again later.',
+          statusCode: response.statusCode,
+        );
+      }
+    } on FormatException {
+      throw ApiException('Invalid response from server');
+    } on http.ClientException {
+      throw ApiException(
+          'Network error. Please check your internet connection.');
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('An unexpected error occurred. Please try again. $e');
+    }
+  }
+
 
 
 }

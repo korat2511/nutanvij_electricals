@@ -7,6 +7,7 @@ import 'package:nutanvij_electricals/screens/inventory/providers/download_report
 import 'package:nutanvij_electricals/screens/inventory/providers/edit_transporter_provider.dart';
 import 'package:nutanvij_electricals/screens/inventory/providers/inventory_provider.dart';
 import 'package:nutanvij_electricals/screens/inventory/providers/transporter_fair_provider.dart';
+import 'package:nutanvij_electricals/screens/site/providers/contractor_provider.dart';
 import 'package:nutanvij_electricals/screens/splash_screen.dart';
 import 'package:nutanvij_electricals/screens/task/task_list_screen.dart';
 import 'package:provider/provider.dart';
@@ -144,6 +145,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         ChangeNotifierProvider(create: (_) => EditTransporterProvider()),
         ChangeNotifierProvider(create: (_) => TransporterFairProvider()),
         ChangeNotifierProvider(create: (_) => DownloadReportProvider()),
+        ChangeNotifierProvider(create: (_) => ContractorProvider()),
 
 
       ],

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nutanvij_electricals/screens/site/providers/contractor_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
@@ -13,6 +14,8 @@ import '../../../widgets/custom_app_bar.dart';
 import '../../../widgets/custom_button.dart';
 import '../../../widgets/custom_text_field.dart';
 import '../../core/utils/navigation_utils.dart';
+import '../../models/contractor.dart';
+import 'contractor_bottomsheet.dart';
 
 class ManpowerManagementScreen extends StatefulWidget {
   final Site site;
@@ -54,11 +57,27 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
   // Form validation
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
+  int _selectedContractorId = -1;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _loadCurrentDateManpower();
+
+    // Call Contractor List
+    Future.microtask(() {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final contractorProvider =
+      Provider.of<ContractorProvider>(context, listen: false);
+
+      contractorProvider.fetchContractors(
+        context: context,
+        siteId: widget.site.id.toString(),
+        userProvider: userProvider,
+      );
+    });
+
   }
 
   @override
@@ -198,12 +217,14 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
         shift: _selectedShift,
         skillPayPerHead: double.parse(_skillPayController.text),
         unskillPayPerHead: double.parse(_unskillPayController.text),
+        contactorId: _selectedContractorId
       );
 
       setState(() {
         _currentManpower = manpower;
         _isLoading = false;
-        _isEditing = false; // Reset editing state
+        _isEditing = false;
+        _selectedContractorId = -1;// Reset editing state
       });
 
       SnackBarUtils.showSuccess(context, 'Manpower data saved successfully!');
@@ -243,6 +264,9 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Access contractor provider once here
+    final contractorProvider = Provider.of<ContractorProvider>(context);
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: CustomAppBar(
@@ -409,6 +433,9 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
   }
 
   Widget _buildAddEditTab() {
+    // Access contractor provider once here
+    final contractorProvider = Provider.of<ContractorProvider>(context);
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -474,6 +501,60 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Contractor Dropdown
+                GestureDetector(
+                  onTap: contractorProvider.isLoading
+                      ? null
+                      : () async {
+                    final selectedId = await showModalBottomSheet<int>(
+                      context: context,
+                      isScrollControlled: true,
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                      ),
+                      builder: (context) => ContractorBottomSheet(
+                        contractors: contractorProvider.contractors,
+                        selectedId: _selectedContractorId,
+                      ),
+                    );
+
+                    if (selectedId != null) {
+                      setState(() {
+                        _selectedContractorId = selectedId;
+                      });
+                    }
+                  },
+
+                  child: AbsorbPointer(
+                    child: CustomTextField(
+                      controller: TextEditingController(
+                        text: contractorProvider.contractors
+                            .firstWhere(
+                              (c) => c.id == _selectedContractorId,
+                          orElse: () => Contractor(
+                            id: 0,
+                            name: '',
+                            mobile: '',
+                            email: '',
+                            siteId: 0,
+                            deletedAt: null,
+                            createdAt: '',
+                            updatedAt: '',
+                          ),
+                        )
+                            .name,
+                      ),
+                      label: 'Select Contractor',
+                      readOnly: true,
+                      suffixIcon: const Icon(Icons.arrow_drop_down,
+                        color: AppColors.primary, // set color here
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Skilled Worker Field
                 CustomTextField(
                   controller: _skillWorkerController,
                   label: 'Skilled Workers (Enter number of skilled workers)',
