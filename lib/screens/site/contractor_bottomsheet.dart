@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_typography.dart';
 import '../../models/contractor.dart';
 
 class ContractorBottomSheet extends StatefulWidget {
   final List<Contractor> contractors;
   final int? selectedId;
+  final VoidCallback onAddContractor;
+
 
   const ContractorBottomSheet({
     Key? key,
     required this.contractors,
     this.selectedId,
+    required this.onAddContractor,
   }) : super(key: key);
 
   @override
@@ -64,6 +69,23 @@ class _ContractorBottomSheetState extends State<ContractorBottomSheet> {
             ),
           ),
           const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: widget.onAddContractor,
+              child: Row(
+                children: [
+                  const Icon(Icons.add_circle, color: AppColors.primary, size: 28),
+                  const SizedBox(width: 12),
+                  Text('Add new contractor',
+                      style: AppTypography.bodyLarge.copyWith(
+                          color: AppColors.primary, fontWeight: FontWeight.w500)),
+                ],
+              ),
+            ),
+          ),
+          const Divider(height: 24, thickness: 1),
           // Contractor list
           Flexible(
             child: ListView.separated(

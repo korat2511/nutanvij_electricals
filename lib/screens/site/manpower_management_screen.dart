@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:nutanvij_electricals/screens/site/providers/contractor_provider.dart';
+import 'package:nutanvij_electricals/widgets/add_contractor_sheet.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
@@ -515,6 +516,24 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
                       builder: (context) => ContractorBottomSheet(
                         contractors: contractorProvider.contractors,
                         selectedId: _selectedContractorId,
+                        onAddContractor: () async {
+                          await showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            shape: const RoundedRectangleBorder(
+                              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                            ),
+                            backgroundColor: Colors.white,
+                            builder: (context) {
+                              return AddContractorSheet(
+                                onAdd: (name) async {
+                                  await _addContractor(name);
+                                },
+                              );
+                            },
+                          );
+                        },
+
                       ),
                     );
 
@@ -947,5 +966,26 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
       ],
     );
   }
+
+  Future<void> _addContractor(String name) async {
+  /*  setState(() => _isTagLoading = true);
+    try {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final apiToken = userProvider.user?.data.apiToken ?? '';
+      final tag = await ApiService().addTag(apiToken: apiToken, name: name);
+      await _fetchTags(); // Refresh the tag list after adding
+      setState(() {
+        _selectedTagId = tag.id;
+        _isTagLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _tagError = e.toString();
+        _isTagLoading = false;
+      });
+    }
+  */
+  }
+
 }
 

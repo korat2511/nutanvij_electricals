@@ -1986,6 +1986,35 @@ class ApiService {
     }
   }
 
+  Future<void> saveContractor({
+    required BuildContext context,
+    required String apiToken,
+    required String name,
+    required String siteId,
+    required String mobile,
+    required String email,
+  }) async {
+    return _handleNetworkCall(() async {
+      var uri = Uri.parse('$baseUrl/saveContractor');
+      var request = http.MultipartRequest('POST', uri);
+
+      // required fields
+      request.fields['api_token'] = apiToken;
+      request.fields['name'] = name;
+      request.fields['site_id'] = siteId;
+      request.fields['mobile'] = mobile;
+      request.fields['email'] = email;
+
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
+
+      log("Save Contractor response == ${response.body}");
+
+      _handleResponse(response, context);
+    });
+  }
+
+
 
 
 }
