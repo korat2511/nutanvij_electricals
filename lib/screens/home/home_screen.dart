@@ -19,6 +19,7 @@ import 'package:geolocator/geolocator.dart';
 import '../hrms/attendance_summary_screen.dart';
 import '../../core/utils/responsive.dart';
 import '../auth/change_password_screen.dart';
+import '../inventory/inventory_screen.dart';
 import '../site/site_list_screen.dart';
 import '../../models/site.dart';
 import '../auth/signup_screen.dart';
@@ -1187,7 +1188,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       _buildQuickActionButton(
                         icon: 'assets/images/inventory.png',
                         label: 'Inventory',
-                        onTap: () {},
+                        onTap: () {
+                          NavigationUtils.push(context, const InventoryScreen());
+
+                        },
                       ),
                       _buildQuickActionButton(
                         icon: 'assets/images/setting.png',

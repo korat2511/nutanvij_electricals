@@ -70,7 +70,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           // Check if user exists and redirect accordingly
       if (userProvider.user != null) {
         log(userProvider.user!.token);
-        
+        print('token ::: ${userProvider.user!.token} ');
+
         // Check for auto checkout on app start
         await AutoCheckoutService.instance.checkForAutoCheckoutOnAppStart(context);
         

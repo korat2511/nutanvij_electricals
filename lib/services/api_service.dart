@@ -5,7 +5,10 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:http/http.dart' as http;
 import '../models/designation.dart';
 import '../models/department.dart';
+import '../models/fair_report_response.dart';
 import '../models/site.dart';
+import '../models/transporter.dart';
+import '../models/transporter_fair.dart';
 import '../models/user_model.dart';
 import 'package:flutter/material.dart';
 import '../core/utils/snackbar_utils.dart';
@@ -46,12 +49,14 @@ class ApiService {
   }
 
   // Helper method to handle common API response parsing and error handling
-  Map<String, dynamic> _handleResponse(http.Response response, BuildContext? context) {
+  Map<String, dynamic> _handleResponse(
+      http.Response response, BuildContext? context) {
     if (response.statusCode == 401) {
       if (context != null) {
         _handleSessionExpired(context);
       }
-      throw ApiException('Session expired. Please login again.', statusCode: 401);
+      throw ApiException('Session expired. Please login again.',
+          statusCode: 401);
     }
 
     try {
@@ -136,7 +141,7 @@ class ApiService {
     } catch (e) {
       if (e is ApiException) rethrow;
       log("E == $e");
-      
+
       // Provide more specific error messages
       if (e.toString().contains('PathNotFoundException')) {
         throw ApiException(
@@ -158,7 +163,6 @@ class ApiService {
   }
 
   Future<UserModel> login(String mobile, String password) async {
-
     // Get device ID
     final deviceInfo = DeviceInfoPlugin();
     String deviceId = '';
@@ -182,7 +186,6 @@ class ApiService {
     // } else {
     //   fcmToken = await FirebaseMessaging.instance.getToken();
     // }
-
 
     return _handleNetworkCall(() async {
       if (mobile.isEmpty) {
@@ -212,13 +215,13 @@ class ApiService {
       final response = await http.get(Uri.parse('$baseUrl/getDesignations'));
       final data = _handleResponse(response, null);
 
-          final List<dynamic> designationsJson = data['data'] ?? [];
-          return designationsJson
-              .where((json) => json['status'] == 'Active')
-              .map((json) => Designation.fromJson(json))
-              .toList();
+      final List<dynamic> designationsJson = data['data'] ?? [];
+      return designationsJson
+          .where((json) => json['status'] == 'Active')
+          .map((json) => Designation.fromJson(json))
+          .toList();
     });
-    }
+  }
 
   Future<UserModel> signup({
     required BuildContext context,
@@ -249,19 +252,29 @@ class ApiService {
     return _handleNetworkCall(() async {
       // Input validation
       if (name.isEmpty) throw ApiException('Name is required', statusCode: 400);
-      if (email.isEmpty) throw ApiException('Email is required', statusCode: 400);
-      if (mobile.isEmpty) throw ApiException('Mobile number is required', statusCode: 400);
-      if (password.isEmpty) throw ApiException('Password is required', statusCode: 400);
-      if (designation == 0) throw ApiException('Designation is required', statusCode: 400);
-      if (subDepartmentId == 0) throw ApiException('Department is required', statusCode: 400);
-      if (address.isEmpty) throw ApiException('Address is required', statusCode: 400);
-      if (dateOfBirth.isEmpty) throw ApiException('Date of birth is required', statusCode: 400);
-      if (gender.isEmpty) throw ApiException('Gender is required', statusCode: 400);
-      if (emergencyContact.isEmpty) throw ApiException('Emergency contact is required', statusCode: 400);
+      if (email.isEmpty)
+        throw ApiException('Email is required', statusCode: 400);
+      if (mobile.isEmpty)
+        throw ApiException('Mobile number is required', statusCode: 400);
+      if (password.isEmpty)
+        throw ApiException('Password is required', statusCode: 400);
+      if (designation == 0)
+        throw ApiException('Designation is required', statusCode: 400);
+      if (subDepartmentId == 0)
+        throw ApiException('Department is required', statusCode: 400);
+      if (address.isEmpty)
+        throw ApiException('Address is required', statusCode: 400);
+      if (dateOfBirth.isEmpty)
+        throw ApiException('Date of birth is required', statusCode: 400);
+      if (gender.isEmpty)
+        throw ApiException('Gender is required', statusCode: 400);
+      if (emergencyContact.isEmpty)
+        throw ApiException('Emergency contact is required', statusCode: 400);
 
       // Email format validation
       if (!email.contains('@') || !email.contains('.')) {
-        throw ApiException('Please enter a valid email address', statusCode: 400);
+        throw ApiException('Please enter a valid email address',
+            statusCode: 400);
       }
 
       // Mobile number validation
@@ -271,16 +284,18 @@ class ApiService {
 
       // Emergency contact validation
       if (emergencyContact.length != 10) {
-        throw ApiException('Emergency contact must be 10 digits', statusCode: 400);
+        throw ApiException('Emergency contact must be 10 digits',
+            statusCode: 400);
       }
 
       // Password length validation
       if (password.length < 6) {
-        throw ApiException('Password must be at least 6 characters', statusCode: 400);
+        throw ApiException('Password must be at least 6 characters',
+            statusCode: 400);
       }
 
       var request = http.MultipartRequest('POST', Uri.parse('$baseUrl/signUp'));
-      
+
       // Add text fields
       request.fields.addAll({
         'name': name,
@@ -297,45 +312,56 @@ class ApiService {
 
       // Add optional fields
       if (salary != null) request.fields['salary'] = salary;
-      if (dateOfJoining != null) request.fields['date_of_joining'] = dateOfJoining;
-      if (bankAccountNo != null && bankAccountNo.isNotEmpty) request.fields['bank_account_no'] = bankAccountNo;
-      if (bankName != null && bankName.isNotEmpty) request.fields['bank_name'] = bankName;
-      if (ifscCode != null && ifscCode.isNotEmpty) request.fields['ifsc_code'] = ifscCode;
-      if (panCardNo != null && panCardNo.isNotEmpty) request.fields['pan_card_no'] = panCardNo;
-      if (aadharCardNo != null && aadharCardNo.isNotEmpty) request.fields['aadhar_card_no'] = aadharCardNo;
+      if (dateOfJoining != null)
+        request.fields['date_of_joining'] = dateOfJoining;
+      if (bankAccountNo != null && bankAccountNo.isNotEmpty)
+        request.fields['bank_account_no'] = bankAccountNo;
+      if (bankName != null && bankName.isNotEmpty)
+        request.fields['bank_name'] = bankName;
+      if (ifscCode != null && ifscCode.isNotEmpty)
+        request.fields['ifsc_code'] = ifscCode;
+      if (panCardNo != null && panCardNo.isNotEmpty)
+        request.fields['pan_card_no'] = panCardNo;
+      if (aadharCardNo != null && aadharCardNo.isNotEmpty)
+        request.fields['aadhar_card_no'] = aadharCardNo;
 
       // Add files
       if (profileImagePath != null) {
-        request.files.add(await http.MultipartFile.fromPath('profile_image', profileImagePath.path));
+        request.files.add(await http.MultipartFile.fromPath(
+            'profile_image', profileImagePath.path));
       }
       if (aadharCardFront != null) {
-        request.files.add(await http.MultipartFile.fromPath('addhar_card_front', aadharCardFront.path));
+        request.files.add(await http.MultipartFile.fromPath(
+            'addhar_card_front', aadharCardFront.path));
       }
       if (aadharCardBack != null) {
-        request.files.add(await http.MultipartFile.fromPath('addhar_card_back', aadharCardBack.path));
+        request.files.add(await http.MultipartFile.fromPath(
+            'addhar_card_back', aadharCardBack.path));
       }
       if (panCardImage != null) {
-        request.files.add(await http.MultipartFile.fromPath('pan_card_image', panCardImage.path));
+        request.files.add(await http.MultipartFile.fromPath(
+            'pan_card_image', panCardImage.path));
       }
       if (passbookImage != null) {
-        request.files.add(await http.MultipartFile.fromPath('passbook_image', passbookImage.path));
+        request.files.add(await http.MultipartFile.fromPath(
+            'passbook_image', passbookImage.path));
       }
 
       var streamedResponse = await request.send();
       var response = await http.Response.fromStream(streamedResponse);
 
       final data = _handleResponse(response, context);
-        return UserModel.fromJson(data);
+      return UserModel.fromJson(data);
     });
   }
 
-  Future<Map<String, dynamic>?> attendanceCheck(BuildContext context, String apiToken) async {
+  Future<Map<String, dynamic>?> attendanceCheck(
+      BuildContext context, String apiToken) async {
     return _handleNetworkCall(() async {
       final response = await http.post(
         Uri.parse('$baseUrl/attendanceCheck'),
         body: {'api_token': apiToken},
       );
-
 
       log("Attendance response body == ${response.body}");
       log("Attendance response body == ${response.statusCode}");
@@ -356,19 +382,22 @@ class ApiService {
     int? siteId,
   }) async {
     return _handleNetworkCall(() async {
-      var request = http.MultipartRequest('POST', Uri.parse('$baseUrl/saveAttendance'));
+      var request =
+          http.MultipartRequest('POST', Uri.parse('$baseUrl/saveAttendance'));
       request.fields['api_token'] = apiToken;
       request.fields['type'] = type;
       request.fields['latitude'] = latitude;
       request.fields['longitude'] = longitude;
       request.fields['address'] = address;
       if (siteId != null) request.fields['site_id'] = siteId.toString();
-      if (checkInDescription != null) request.fields['check_in_description'] = checkInDescription;
+      if (checkInDescription != null)
+        request.fields['check_in_description'] = checkInDescription;
       if (imagePath != null && imagePath.isNotEmpty) {
         try {
           final file = File(imagePath);
           if (await file.exists()) {
-            request.files.add(await http.MultipartFile.fromPath('image', imagePath));
+            request.files
+                .add(await http.MultipartFile.fromPath('image', imagePath));
           }
         } catch (e) {
           print('Error adding image file: $e');
@@ -417,11 +446,11 @@ class ApiService {
       final response = await http.post(
         Uri.parse('$baseUrl/requestForChangeTime'),
         body: {
-        'api_token': apiToken,
-        'attendance_id': attendanceId,
-        'type': type,
-        'time': time,
-        'reason': reason,
+          'api_token': apiToken,
+          'attendance_id': attendanceId,
+          'type': type,
+          'time': time,
+          'reason': reason,
         },
       );
       return _handleResponse(response, context);
@@ -448,7 +477,7 @@ class ApiService {
         },
       );
       final data = _handleResponse(response, context);
-        return List<Map<String, dynamic>>.from(data['data']);
+      return List<Map<String, dynamic>>.from(data['data']);
     });
   }
 
@@ -487,14 +516,14 @@ class ApiService {
       final response = await http.post(
         Uri.parse('$baseUrl/attendanceRequestList'),
         body: {
-        'api_token': apiToken,
-        'start_date': startDate,
-        'end_date': endDate,
-        'user_id': userId,
+          'api_token': apiToken,
+          'start_date': startDate,
+          'end_date': endDate,
+          'user_id': userId,
         },
       );
       final data = _handleResponse(response, context);
-        return List<Map<String, dynamic>>.from(data['data']);
+      return List<Map<String, dynamic>>.from(data['data']);
     });
   }
 
@@ -536,7 +565,7 @@ class ApiService {
         },
       );
       final data = _handleResponse(response, context);
-        return List<Map<String, dynamic>>.from(data['data']);
+      return List<Map<String, dynamic>>.from(data['data']);
     });
   }
 
@@ -544,7 +573,7 @@ class ApiService {
     return _handleNetworkCall(() async {
       final response = await http.get(Uri.parse('$baseUrl/getDepartment'));
       final data = _handleResponse(response, null);
-          final List<dynamic> departmentsJson = data['data'] ?? [];
+      final List<dynamic> departmentsJson = data['data'] ?? [];
       return departmentsJson.map((json) => Department.fromJson(json)).toList();
     });
   }
@@ -575,15 +604,16 @@ class ApiService {
   }) async {
     return _handleNetworkCall(() async {
       if (newPassword != confirmPassword) {
-        throw ApiException('New password and confirm password do not match', statusCode: 400);
+        throw ApiException('New password and confirm password do not match',
+            statusCode: 400);
       }
       final response = await http.post(
         Uri.parse('$baseUrl/changePassword'),
         body: {
-        'api_token': apiToken,
-        'current_password': currentPassword,
-        'new_password': newPassword,
-        'confirm_password': confirmPassword,
+          'api_token': apiToken,
+          'current_password': currentPassword,
+          'new_password': newPassword,
+          'confirm_password': confirmPassword,
         },
       );
       _handleResponse(response, context);
@@ -596,14 +626,14 @@ class ApiService {
     String? userId,
   }) async {
     return _handleNetworkCall(() async {
-    final body = {
-      'api_token': apiToken,
-    };
-    if (userId != null) body['user_id'] = userId;
-    final response = await http.post(
-      Uri.parse('$baseUrl/leaveList'),
-      body: body,
-    );
+      final body = {
+        'api_token': apiToken,
+      };
+      if (userId != null) body['user_id'] = userId;
+      final response = await http.post(
+        Uri.parse('$baseUrl/leaveList'),
+        body: body,
+      );
       final data = _handleResponse(response, context);
       return List<Map<String, dynamic>>.from(data['data']);
     });
@@ -654,7 +684,8 @@ class ApiService {
         'end_date': endDate,
         'reason': reason,
       };
-      if (earlyOffStartTime != null) body['early_off_start_time'] = earlyOffStartTime;
+      if (earlyOffStartTime != null)
+        body['early_off_start_time'] = earlyOffStartTime;
       if (earlyOffEndTime != null) body['early_off_end_time'] = earlyOffEndTime;
       if (halfDaySession != null) body['half_day_session'] = halfDaySession;
       final response = await http.post(
@@ -692,14 +723,16 @@ class ApiService {
     required List<dynamic> images,
   }) async {
     return _handleNetworkCall(() async {
-      var request = http.MultipartRequest('POST', Uri.parse('$baseUrl/applyForEmployeeExpense'));
+      var request = http.MultipartRequest(
+          'POST', Uri.parse('$baseUrl/applyForEmployeeExpense'));
       request.fields['api_token'] = apiToken;
       request.fields['title'] = title;
       request.fields['amount'] = amount;
       request.fields['description'] = description;
       request.fields['expense_date'] = expenseDate;
       for (var img in images) {
-        request.files.add(await http.MultipartFile.fromPath('images[]', img.path));
+        request.files
+            .add(await http.MultipartFile.fromPath('images[]', img.path));
       }
       var streamedResponse = await request.send();
       var response = await http.Response.fromStream(streamedResponse);
@@ -713,14 +746,14 @@ class ApiService {
     String? userId,
   }) async {
     return _handleNetworkCall(() async {
-    final body = {
-      'api_token': apiToken,
-    };
-    if (userId != null) body['user_id'] = userId;
-    final response = await http.post(
-      Uri.parse('$baseUrl/employeeExpenseList'),
-      body: body,
-    );
+      final body = {
+        'api_token': apiToken,
+      };
+      if (userId != null) body['user_id'] = userId;
+      final response = await http.post(
+        Uri.parse('$baseUrl/employeeExpenseList'),
+        body: body,
+      );
       final data = _handleResponse(response, context);
       return List<Map<String, dynamic>>.from(data['data']);
     });
@@ -737,10 +770,9 @@ class ApiService {
     return _handleNetworkCall(() async {
       final body = {
         'api_token': apiToken,
-        'approved_amount' : approvedAmount.toString(),
+        'approved_amount': approvedAmount.toString(),
         'employee_expense_id': expenseId,
         'status': status,
-
       };
       if (reason != null && reason.isNotEmpty) {
         body['admin_reason'] = reason;
@@ -749,7 +781,6 @@ class ApiService {
         Uri.parse('$baseUrl/employeeExpenseRequestAction'),
         body: body,
       );
-
 
       log("RES == ${response.body}");
 
@@ -766,8 +797,8 @@ class ApiService {
       final response = await http.post(
         Uri.parse('$baseUrl/employeeExpenseCancel'),
         body: {
-        'api_token': apiToken,
-        'employee_expense_id': expenseId,
+          'api_token': apiToken,
+          'employee_expense_id': expenseId,
         },
       );
       _handleResponse(response, context);
@@ -806,7 +837,8 @@ class ApiService {
     } on FormatException {
       throw ApiException('Invalid response from server');
     } on http.ClientException {
-      throw ApiException('Network error. Please check your internet connection.');
+      throw ApiException(
+          'Network error. Please check your internet connection.');
     } catch (e) {
       if (e is ApiException) rethrow;
       throw ApiException('An unexpected error occurred. Please try again. $e');
@@ -882,7 +914,6 @@ class ApiService {
       var streamedResponse = await request.send();
       var response = await http.Response.fromStream(streamedResponse);
 
-
       log("Create site response == ${response.body}");
 
       _handleResponse(response, context);
@@ -920,11 +951,10 @@ class ApiService {
       request.fields['min_range'] = minRange.toString();
       request.fields['max_range'] = maxRange.toString();
 
-      
       for (var img in newImagePaths) {
         request.files.add(await http.MultipartFile.fromPath('images[]', img));
       }
-      
+
       var streamedResponse = await request.send();
       var response = await http.Response.fromStream(streamedResponse);
 
@@ -1002,13 +1032,19 @@ class ApiService {
     return _handleNetworkCall(() async {
       // Input validation (only required fields)
       if (name.isEmpty) throw ApiException('Name is required', statusCode: 400);
-      if (mobile.isEmpty) throw ApiException('Mobile number is required', statusCode: 400);
-      if (email.isEmpty) throw ApiException('Email is required', statusCode: 400);
-      if (password.isEmpty) throw ApiException('Password is required', statusCode: 400);
-      if (designationId == 0) throw ApiException('Designation is required', statusCode: 400);
-      if (subDepartmentId == 0) throw ApiException('Sub Department is required', statusCode: 400);
+      if (mobile.isEmpty)
+        throw ApiException('Mobile number is required', statusCode: 400);
+      if (email.isEmpty)
+        throw ApiException('Email is required', statusCode: 400);
+      if (password.isEmpty)
+        throw ApiException('Password is required', statusCode: 400);
+      if (designationId == 0)
+        throw ApiException('Designation is required', statusCode: 400);
+      if (subDepartmentId == 0)
+        throw ApiException('Sub Department is required', statusCode: 400);
 
-      var request = http.MultipartRequest('POST', Uri.parse('$baseUrl/create-user'));
+      var request =
+          http.MultipartRequest('POST', Uri.parse('$baseUrl/create-user'));
       request.fields.addAll({
         'name': name,
         'mobile': mobile,
@@ -1020,32 +1056,47 @@ class ApiService {
         'has_keypad_mobile': hasKeypadMobile.toString(),
       });
       // Add optional fields
-      if (address != null && address.isNotEmpty) request.fields['address'] = address;
-      if (dateOfBirth != null && dateOfBirth.isNotEmpty) request.fields['dob'] = dateOfBirth;
-      if (gender != null && gender.isNotEmpty) request.fields['gender'] = gender;
-      if (emergencyContact != null && emergencyContact.isNotEmpty) request.fields['emergency_contact'] = emergencyContact;
+      if (address != null && address.isNotEmpty)
+        request.fields['address'] = address;
+      if (dateOfBirth != null && dateOfBirth.isNotEmpty)
+        request.fields['dob'] = dateOfBirth;
+      if (gender != null && gender.isNotEmpty)
+        request.fields['gender'] = gender;
+      if (emergencyContact != null && emergencyContact.isNotEmpty)
+        request.fields['emergency_contact'] = emergencyContact;
       if (salary != null) request.fields['salary'] = salary;
-      if (dateOfJoining != null) request.fields['date_of_joining'] = dateOfJoining;
-      if (bankAccountNo != null && bankAccountNo.isNotEmpty) request.fields['bank_account_no'] = bankAccountNo;
-      if (bankName != null && bankName.isNotEmpty) request.fields['bank_name'] = bankName;
-      if (ifscCode != null && ifscCode.isNotEmpty) request.fields['ifsc_code'] = ifscCode;
-      if (panCardNo != null && panCardNo.isNotEmpty) request.fields['pan_card_no'] = panCardNo;
-      if (aadharCardNo != null && aadharCardNo.isNotEmpty) request.fields['aadhar_card_no'] = aadharCardNo;
+      if (dateOfJoining != null)
+        request.fields['date_of_joining'] = dateOfJoining;
+      if (bankAccountNo != null && bankAccountNo.isNotEmpty)
+        request.fields['bank_account_no'] = bankAccountNo;
+      if (bankName != null && bankName.isNotEmpty)
+        request.fields['bank_name'] = bankName;
+      if (ifscCode != null && ifscCode.isNotEmpty)
+        request.fields['ifsc_code'] = ifscCode;
+      if (panCardNo != null && panCardNo.isNotEmpty)
+        request.fields['pan_card_no'] = panCardNo;
+      if (aadharCardNo != null && aadharCardNo.isNotEmpty)
+        request.fields['aadhar_card_no'] = aadharCardNo;
       // Add files
       if (profileImagePath != null) {
-        request.files.add(await http.MultipartFile.fromPath('profile_image', profileImagePath.path));
+        request.files.add(await http.MultipartFile.fromPath(
+            'profile_image', profileImagePath.path));
       }
       if (aadharCardFront != null) {
-        request.files.add(await http.MultipartFile.fromPath('addhar_card_front', aadharCardFront.path));
+        request.files.add(await http.MultipartFile.fromPath(
+            'addhar_card_front', aadharCardFront.path));
       }
       if (aadharCardBack != null) {
-        request.files.add(await http.MultipartFile.fromPath('addhar_card_back', aadharCardBack.path));
+        request.files.add(await http.MultipartFile.fromPath(
+            'addhar_card_back', aadharCardBack.path));
       }
       if (panCardImage != null) {
-        request.files.add(await http.MultipartFile.fromPath('pan_card_image', panCardImage.path));
+        request.files.add(await http.MultipartFile.fromPath(
+            'pan_card_image', panCardImage.path));
       }
       if (passbookImage != null) {
-        request.files.add(await http.MultipartFile.fromPath('passbook_image', passbookImage.path));
+        request.files.add(await http.MultipartFile.fromPath(
+            'passbook_image', passbookImage.path));
       }
       var streamedResponse = await request.send();
       var response = await http.Response.fromStream(streamedResponse);
@@ -1065,8 +1116,10 @@ class ApiService {
       'api_token': apiToken,
       'site_id': siteId.toString(),
     };
-    if (designationId != null) body['designation_id'] = designationId.toString();
-    if (hasKeypadMobile != null) body['has_keypad_mobile'] = hasKeypadMobile.toString();
+    if (designationId != null)
+      body['designation_id'] = designationId.toString();
+    if (hasKeypadMobile != null)
+      body['has_keypad_mobile'] = hasKeypadMobile.toString();
 
     final response = await http.post(
       Uri.parse('$baseUrl/getUserBySite'),
@@ -1095,14 +1148,13 @@ class ApiService {
           'api_token': apiToken,
           'type': type,
           'user_id': userIds,
-          'site_id' : siteId.toString(),
+          'site_id': siteId.toString(),
           'latitude': latitude,
           'longitude': longitude,
           'address': address,
           'check_in_description': checkInDescription,
         }),
       );
-
 
       log("R == ${response.body}");
 
@@ -1155,7 +1207,6 @@ class ApiService {
     String? search,
   }) async {
     return _handleNetworkCall(() async {
-
       log("status = $status");
 
       final response = await http.post(
@@ -1208,7 +1259,8 @@ class ApiService {
     required List<File> taskImages,
     required List<File> taskAttachments,
   }) async {
-    var request = http.MultipartRequest('POST', Uri.parse('$baseUrl/createTask'));
+    var request =
+        http.MultipartRequest('POST', Uri.parse('$baseUrl/createTask'));
     request.fields['api_token'] = apiToken;
     request.fields['site_id'] = siteId.toString();
     request.fields['name'] = name;
@@ -1218,14 +1270,15 @@ class ApiService {
     request.fields['tags'] = tags;
 
     for (var imageFile in taskImages) {
-      var file = await http.MultipartFile.fromPath("task_images[]", imageFile.path);
+      var file =
+          await http.MultipartFile.fromPath("task_images[]", imageFile.path);
       request.files.add(file);
     }
     for (var att in taskAttachments) {
-      var file = await http.MultipartFile.fromPath("task_attachments[]", att.path);
+      var file =
+          await http.MultipartFile.fromPath("task_attachments[]", att.path);
       request.files.add(file);
     }
-
 
     final streamedResponse = await request.send();
     final response = await http.Response.fromStream(streamedResponse);
@@ -1274,22 +1327,21 @@ class ApiService {
     request.fields['assign_to'] = assignTo;
     request.fields['tags'] = tags;
 
-
     log("TSK IMAGES == $taskImages");
 
-
     for (var imageFile in taskImages) {
-      var file = await http.MultipartFile.fromPath("task_images[]", imageFile.path);
+      var file =
+          await http.MultipartFile.fromPath("task_images[]", imageFile.path);
       request.files.add(file);
     }
     for (var att in taskAttachments) {
-      var file = await http.MultipartFile.fromPath("task_attachments[]", att.path);
+      var file =
+          await http.MultipartFile.fromPath("task_attachments[]", att.path);
       request.files.add(file);
     }
 
     final streamedResponse = await request.send();
     final response = await http.Response.fromStream(streamedResponse);
-
 
     log("Response == ${response.body}");
 
@@ -1307,7 +1359,8 @@ class ApiService {
     List<File>? images,
     List<File>? attachments,
   }) async {
-    var request = http.MultipartRequest('POST', Uri.parse('$baseUrl/updateProgress'));
+    var request =
+        http.MultipartRequest('POST', Uri.parse('$baseUrl/updateProgress'));
     request.fields['api_token'] = apiToken;
     request.fields['task_id'] = taskId.toString();
     request.fields['work_done'] = workDone;
@@ -1316,17 +1369,18 @@ class ApiService {
       request.fields['remark'] = remark;
     }
 
-
     if (images != null) {
       for (var imageFile in images) {
-        var file = await http.MultipartFile.fromPath("images[]", imageFile.path);
+        var file =
+            await http.MultipartFile.fromPath("images[]", imageFile.path);
         request.files.add(file);
       }
     }
 
     if (attachments != null) {
       for (var attachmentFile in attachments) {
-        var file = await http.MultipartFile.fromPath("attachments[]", attachmentFile.path);
+        var file = await http.MultipartFile.fromPath(
+            "attachments[]", attachmentFile.path);
         request.files.add(file);
       }
     }
@@ -1369,8 +1423,9 @@ class ApiService {
     List<File>? attachments,
   }) async {
     return _handleNetworkCall(() async {
-      var request = http.MultipartRequest('POST', Uri.parse('$baseUrl/editProgress'));
-      
+      var request =
+          http.MultipartRequest('POST', Uri.parse('$baseUrl/editProgress'));
+
       request.fields['api_token'] = apiToken;
       request.fields['task_progress_id'] = progressId.toString();
       request.fields['work_done'] = workDone;
@@ -1380,14 +1435,16 @@ class ApiService {
 
       if (images != null) {
         for (var imageFile in images) {
-          var file = await http.MultipartFile.fromPath("images[]", imageFile.path);
+          var file =
+              await http.MultipartFile.fromPath("images[]", imageFile.path);
           request.files.add(file);
         }
       }
 
       if (attachments != null) {
         for (var attachmentFile in attachments) {
-          var file = await http.MultipartFile.fromPath("attachments[]", attachmentFile.path);
+          var file = await http.MultipartFile.fromPath(
+              "attachments[]", attachmentFile.path);
           request.files.add(file);
         }
       }
@@ -1520,7 +1577,6 @@ class ApiService {
           },
         );
 
-
         // Parse the response directly since this endpoint returns data without wrapper
         if (response.statusCode == 200) {
           final Map<String, dynamic> data = json.decode(response.body);
@@ -1554,18 +1610,19 @@ class ApiService {
         },
       );
       final data = _handleResponse(response, context);
-      
+
       // Check if data exists, return null if no data found
       if (data['data'] == null || data['data'] == '') {
         return null;
       }
-      
+
       try {
         return Manpower.fromJson(data['data']);
       } catch (e) {
         log('Error parsing manpower data: $e');
         log('Data received: ${data['data']}');
-        throw ApiException('Invalid data format received from server', statusCode: 500);
+        throw ApiException('Invalid data format received from server',
+            statusCode: 500);
       }
     });
   }
@@ -1588,18 +1645,22 @@ class ApiService {
         },
       );
       final data = _handleResponse(response, context);
-      
+
       // Handle case where data might be null or empty
-      if (data['data'] == null || data['data'] == '' || (data['data'] is List && (data['data'] as List).isEmpty)) {
-        return ManpowerReport(data: [], message: data['message'] ?? 'No data found');
+      if (data['data'] == null ||
+          data['data'] == '' ||
+          (data['data'] is List && (data['data'] as List).isEmpty)) {
+        return ManpowerReport(
+            data: [], message: data['message'] ?? 'No data found');
       }
-      
+
       try {
         return ManpowerReport.fromJson(data);
       } catch (e) {
         log('Error parsing manpower report data: $e');
         log('Data received: ${data['data']}');
-        throw ApiException('Invalid data format received from server', statusCode: 500);
+        throw ApiException('Invalid data format received from server',
+            statusCode: 500);
       }
     });
   }
@@ -1630,15 +1691,254 @@ class ApiService {
         },
       );
       final data = _handleResponse(response, context);
-      
+
       try {
         return Manpower.fromJson(data['data']);
       } catch (e) {
         log('Error parsing stored manpower data: $e');
         log('Data received: ${data['data']}');
-        throw ApiException('Invalid data format received from server', statusCode: 500);
+        throw ApiException('Invalid data format received from server',
+            statusCode: 500);
       }
     });
   }
 
-} 
+  Future<List<Transporter>> getTransporterList({
+    required BuildContext context,
+    required String apiToken,
+    int page = 1,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/getTransporter'),
+        body: {
+          'api_token': apiToken,
+          'page': page.toString(),
+        },
+      );
+
+      final data = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        if (data['status'] == 1) {
+          final List list = data['data'];
+          return list.map((e) => Transporter.fromJson(e)).toList();
+        } else {
+          throw ApiException(data['message'] ?? 'Transporter loading failed');
+        }
+      } else if (response.statusCode == 401) {
+        _handleSessionExpired(context);
+        throw ApiException('Session expired');
+      } else {
+        throw ApiException(
+          'Server error occurred. Please try again later.',
+          statusCode: response.statusCode,
+        );
+      }
+    } on FormatException {
+      throw ApiException('Invalid response from server');
+    } on http.ClientException {
+      throw ApiException(
+          'Network error. Please check your internet connection.');
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('An unexpected error occurred. Please try again. $e');
+    }
+  }
+
+  Future<void> createTransporter({
+    required BuildContext context,
+    required String apiToken,
+    required String name,
+    required String email,
+    required String phone,
+    required String address,
+    required String pancard,
+    required String fair,
+    required String vehicleType,
+    required String company,
+  }) async {
+    return _handleNetworkCall(() async {
+      var uri = Uri.parse('$baseUrl/createTransporter');
+      var request = http.MultipartRequest('POST', uri);
+
+      // required fields
+      request.fields['api_token'] = apiToken;
+      request.fields['name'] = name;
+      request.fields['email'] = email;
+      request.fields['phone'] = phone;
+      request.fields['address'] = address;
+      request.fields['pancard'] = pancard;
+      request.fields['fair'] = fair;
+      request.fields['vehicle_type'] = vehicleType;
+      request.fields['company'] = company;
+
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
+
+      log("Create transporter response == ${response.body}");
+
+      _handleResponse(response, context);
+    });
+  }
+
+  Future<void> updateTransporter({
+    required BuildContext context,
+    required String apiToken,
+    required int transporterId,
+    required String name,
+    required String email,
+    required String phone,
+    required String address,
+    required String pancard,
+    required String fair,
+    required String vehicleType,
+    required String company,
+  }) async {
+    return _handleNetworkCall(() async {
+      var uri = Uri.parse('$baseUrl/updateTransporter');
+      var request = http.MultipartRequest('POST', uri);
+
+      // Required fields
+      request.fields['api_token'] = apiToken;
+      request.fields['id'] = transporterId.toString();
+      request.fields['name'] = name;
+      request.fields['email'] = email;
+      request.fields['phone'] = phone;
+      request.fields['address'] = address;
+      request.fields['pancard'] = pancard;
+      request.fields['fair'] = fair;
+      request.fields['vehicle_type'] = vehicleType;
+      request.fields['company'] = company;
+
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
+
+      log("Update transporter response == ${response.body}");
+
+      _handleResponse(response, context);
+    });
+  }
+
+  Future<List<TransporterFair>> getTransporterFairList({
+    required BuildContext context,
+    required String apiToken,
+    required int transporterId,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/getTransporterFair'),
+        body: {
+          "api_token": apiToken,
+          "transporter_id": transporterId.toString(),
+        },
+      );
+
+      final data = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        if (data["status"] == 1) {
+          final List list = data["data"];
+          return list.map((e) => TransporterFair.fromJson(e)).toList();
+        } else {
+          throw ApiException(
+              data["message"] ?? "Failed to load transporter fair");
+        }
+      } else if (response.statusCode == 401) {
+        // TODO: handle session expired UI
+        throw ApiException("Session expired");
+      } else {
+        throw ApiException(
+          "Server error occurred. Please try again later.",
+          statusCode: response.statusCode,
+        );
+      }
+    } on FormatException {
+      throw ApiException("Invalid response from server");
+    } on http.ClientException {
+      throw ApiException(
+          "Network error. Please check your internet connection.");
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException("An unexpected error occurred. $e");
+    }
+  }
+
+  Future<void> storeTransporterFair({
+    required BuildContext context,
+    required String apiToken,
+    required int transporterId,
+    required String fair,
+    required String date,
+    required String toLocation,
+    required String fromLocation,
+  }) async {
+    return _handleNetworkCall(() async {
+      var uri = Uri.parse('$baseUrl/storeTransporterFair');
+      var request = http.MultipartRequest('POST', uri);
+
+      request.fields['api_token'] = apiToken;
+      request.fields['transporter_id'] = transporterId.toString();
+      request.fields['fair'] = fair;
+      request.fields['date'] = date;
+      request.fields['to_location'] = toLocation;
+      request.fields['from_location'] = fromLocation;
+
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
+
+      log("Store Transporter Fair response == ${response.body}");
+
+      _handleResponse(response, context);
+    });
+  }
+
+  Future<FairReportResponse> getFairReport({
+    required BuildContext context,
+    required String apiToken,
+    required String transporterId,
+    required String startDate,
+    required String endDate,
+  }) async {
+    try {
+
+      print('transporter id ::: $transporterId');
+      final response = await http.post(
+        Uri.parse('$baseUrl/getFairReport'),
+        body: {
+          "api_token": apiToken,
+          "transporter_id": transporterId.toString(),
+          "start_date": startDate,
+          "end_date": endDate,
+        },
+      );
+
+      final data = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        if (data["status"] == 1) {
+          return FairReportResponse.fromJson(data);
+        } else {
+          throw ApiException(data["message"] ?? "Failed to fetch report");
+        }
+      } else if (response.statusCode == 401) {
+        throw ApiException("Session expired");
+      } else {
+        throw ApiException(
+          "Server error occurred. Please try again later.",
+          statusCode: response.statusCode,
+        );
+      }
+    } on FormatException {
+      throw ApiException("Invalid response from server");
+    } on http.ClientException {
+      throw ApiException(
+          "Network error. Please check your internet connection.");
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException("An unexpected error occurred. $e");
+    }
+  }
+
+
+}

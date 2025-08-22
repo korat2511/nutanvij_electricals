@@ -2,6 +2,11 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:nutanvij_electricals/screens/home/home_screen.dart';
+import 'package:nutanvij_electricals/screens/inventory/providers/create_transporter_provider.dart';
+import 'package:nutanvij_electricals/screens/inventory/providers/download_report_provider.dart';
+import 'package:nutanvij_electricals/screens/inventory/providers/edit_transporter_provider.dart';
+import 'package:nutanvij_electricals/screens/inventory/providers/inventory_provider.dart';
+import 'package:nutanvij_electricals/screens/inventory/providers/transporter_fair_provider.dart';
 import 'package:nutanvij_electricals/screens/splash_screen.dart';
 import 'package:nutanvij_electricals/screens/task/task_list_screen.dart';
 import 'package:provider/provider.dart';
@@ -131,8 +136,17 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => UserProvider(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => UserProvider()),
+        ChangeNotifierProvider(create: (_) => InventoryProvider()), // 👈 Added
+        ChangeNotifierProvider(create: (_) => CreateTransporterProvider()),
+        ChangeNotifierProvider(create: (_) => EditTransporterProvider()),
+        ChangeNotifierProvider(create: (_) => TransporterFairProvider()),
+        ChangeNotifierProvider(create: (_) => DownloadReportProvider()),
+
+
+      ],
       child: MaterialApp(
         navigatorKey: ForegroundNotificationService.navigatorKey,
         debugShowCheckedModeBanner: false,
@@ -149,6 +163,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         },
         home: const SplashScreen(),
       ),
+
     );
   }
 }
