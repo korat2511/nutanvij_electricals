@@ -6,7 +6,7 @@ import 'custom_text_field.dart';
 import '../core/utils/transporter_validations_utils.dart';
 
 class AddContractorSheet extends StatefulWidget {
-  final Future<void> Function(String) onAdd;
+  final Future<void> Function(String, String, String) onAdd;
   const AddContractorSheet({Key? key, required this.onAdd}) : super(key: key);
 
   @override
@@ -122,7 +122,9 @@ class _AddContractorSheetState extends State<AddContractorSheet> {
                   if (_formKey.currentState!.validate()) {
                     setState(() => _isLoading = true);
 
-                    await widget.onAdd(_nameController.text.trim());
+                    await widget.onAdd(_nameController.text.trim(),
+                        _emailController.text.trim(),
+                        _phoneController.text.trim());
 
                     setState(() => _isLoading = false);
                     if (context.mounted) {

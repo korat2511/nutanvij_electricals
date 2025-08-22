@@ -1,4 +1,6 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:provider/provider.dart';
+
 import '../../../models/contractor.dart';
 import '../../../providers/user_provider.dart';
 import '../../../services/api_service.dart';
@@ -34,6 +36,42 @@ class ContractorProvider with ChangeNotifier {
     } catch (e) {
       _isLoading = false;
       _error = e.toString();
+      notifyListeners();
+    }
+  }
+
+  /// 👇 New Method
+  Future<void> addContractor({
+    required BuildContext context,
+    required String apiToken,
+    required String siteId,
+    required String name,
+    required String mobile,
+    required String email,
+  }) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      await ApiService().saveContractor(
+        context: context,
+        apiToken: apiToken,
+        siteId: siteId,
+        name: name,
+        mobile: mobile,
+        email: email,
+      );
+
+      // After successful save, refresh the contractor list
+      await fetchContractors(
+        context: context,
+        siteId: siteId,
+        userProvider: Provider.of<UserProvider>(context, listen: false),
+      );
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _isLoading = false;
       notifyListeners();
     }
   }

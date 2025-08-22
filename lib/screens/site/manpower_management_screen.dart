@@ -526,8 +526,8 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
                             backgroundColor: Colors.white,
                             builder: (context) {
                               return AddContractorSheet(
-                                onAdd: (name) async {
-                                  await _addContractor(name);
+                                onAdd: (name, email, phone) async {
+                                  await _addContractor(name, email, phone);
                                 },
                               );
                             },
@@ -967,25 +967,24 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
     );
   }
 
-  Future<void> _addContractor(String name) async {
-  /*  setState(() => _isTagLoading = true);
-    try {
-      final userProvider = Provider.of<UserProvider>(context, listen: false);
-      final apiToken = userProvider.user?.data.apiToken ?? '';
-      final tag = await ApiService().addTag(apiToken: apiToken, name: name);
-      await _fetchTags(); // Refresh the tag list after adding
-      setState(() {
-        _selectedTagId = tag.id;
-        _isTagLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _tagError = e.toString();
-        _isTagLoading = false;
-      });
+  Future<void> _addContractor(String name, String email, String phone) async {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final contractorProvider = Provider.of<ContractorProvider>(context, listen: false);
+
+    await contractorProvider.addContractor(
+      context: context,
+      apiToken: userProvider.user?.data.apiToken ?? '',
+      siteId: widget.site.id.toString(),
+      name: name,
+      mobile: phone,
+      email: email,
+    );
+
+    if (mounted) {
+      SnackBarUtils.showSuccess(context, 'Contractor added successfully!');
     }
-  */
   }
+
 
 }
 
