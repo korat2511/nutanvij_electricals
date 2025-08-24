@@ -144,6 +144,60 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
     }
   }
 
+  Future<void> _loadCurrentDateManpowerContractor(int contractor_id) async {
+    setState(() {
+      _isLoadingManpower = true;
+      _error = null;
+    });
+
+    try {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final dateString = DateFormat('yyyy-MM-dd').format(_selectedDate);
+
+      final manpower = await ApiService().getManPowerWithContractor(
+        context: context,
+        apiToken: userProvider.user?.data.apiToken ?? '',
+        siteId: widget.site.id,
+        date: dateString,
+        contractor_id: contractor_id
+      );
+
+      setState(() {
+        _currentManpower = manpower;
+        _isLoadingManpower = false;
+      });
+
+      // Pre-fill form if data exists
+      if (manpower?.id != null) {
+        _skillWorkerController.text = manpower!.skillWorker.toString();
+        _unskillWorkerController.text = manpower.unskillWorker.toString();
+        _skillPayController.text = manpower.skillPayPerHead.toString();
+        _unskillPayController.text = manpower.unskillPayPerHead.toString();
+        _selectedShift = manpower.shift;
+      } else {
+        _clearForm();
+      }
+    } catch (e) {
+      setState(() {
+        _error = null; // Clear any previous errors
+        _isLoadingManpower = false;
+      });
+      _clearForm();
+
+      // Log the error for debugging
+      print('Manpower loading error: $e');
+
+      // Don't show error for "no data found" - this is expected behavior
+      if (!e.toString().contains('No data found') &&
+          !e.toString().contains('null') &&
+          !e.toString().contains('type')) {
+        setState(() {
+          _error = 'Failed to load manpower data. Please try again.';
+        });
+      }
+    }
+  }
+
   Future<void> _loadManpowerRange() async {
     setState(() {
       _isLoadingRange = true;
@@ -542,6 +596,10 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
                       setState(() {
                         _selectedContractorId = selectedId;
                       });
+
+                      // 🔥 Call API again after selecting contractor
+                      _loadCurrentDateManpowerContractor(_selectedContractorId);
+
                     }
                   },
 
@@ -765,6 +823,9 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
                         _skillPayController.text = manpower.skillPayPerHead.toString();
                         _unskillPayController.text = manpower.unskillPayPerHead.toString();
                         _selectedShift = manpower.shift;
+                        if(manpower.contractor != null) {
+                          _selectedContractorId = manpower.contractor!.id;
+                        }
                       },
                       child: Container(
                         padding: const EdgeInsets.all(8),
@@ -785,7 +846,26 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
             ),
             
             const SizedBox(height: 12),
-            
+
+            // 🔹 Contractor Info
+            if (manpower.contractor != null) ...[
+              Row(
+                children: [
+                  Icon(Icons.business, color: AppColors.primary, size: 20),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      manpower.contractor?.name ?? "N/A",
+                      style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            // 🔹 Skilled & Unskilled Workers
+
             Row(
               children: [
                 Expanded(

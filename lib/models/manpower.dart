@@ -1,3 +1,5 @@
+import 'contractor.dart';
+
 class Manpower {
   final int? id;
   final int siteId;
@@ -10,6 +12,7 @@ class Manpower {
   final double totalAmount;
   final String? createdAt;
   final String? updatedAt;
+  Contractor? contractor;
 
   Manpower({
     this.id,
@@ -23,6 +26,7 @@ class Manpower {
     required this.totalAmount,
     this.createdAt,
     this.updatedAt,
+    this.contractor
   });
 
   factory Manpower.fromJson(Map<String, dynamic> json) {
@@ -38,6 +42,10 @@ class Manpower {
       totalAmount: _parseDouble(json['total_amount']) ?? 0.0,
       createdAt: json['created_at']?.toString(),
       updatedAt: json['updated_at']?.toString(),
+      contractor: json['contractor'] != null
+          ? Contractor.fromJson(json['contractor'])
+          : null, // ✅ Parse contractor
+
     );
   }
 
@@ -74,6 +82,8 @@ class Manpower {
       'total_amount': totalAmount,
       'created_at': createdAt,
       'updated_at': updatedAt,
+      'contractor': contractor?.toJson(), // ✅ Serialize contractor
+
     };
   }
 
@@ -89,6 +99,8 @@ class Manpower {
     double? totalAmount,
     String? createdAt,
     String? updatedAt,
+    Contractor? contractor,
+
   }) {
     return Manpower(
       id: id ?? this.id,
@@ -102,6 +114,8 @@ class Manpower {
       totalAmount: totalAmount ?? this.totalAmount,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      contractor: contractor ?? this.contractor,
+
     );
   }
 
@@ -120,6 +134,56 @@ class Manpower {
 
   int get totalWorkers => skillWorker + unskillWorker;
 }
+
+/*
+class Contractor {
+  final int? id;
+  final String? name;
+  final String? mobile;
+  final String? email;
+  final int? siteId;
+  final String? createdAt;
+  final String? updatedAt;
+  final String? deletedAt;
+
+  Contractor({
+    this.id,
+    this.name,
+    this.mobile,
+    this.email,
+    this.siteId,
+    this.createdAt,
+    this.updatedAt,
+    this.deletedAt,
+  });
+
+  factory Contractor.fromJson(Map<String, dynamic> json) {
+    return Contractor(
+      id: json['id'],
+      name: json['name'],
+      mobile: json['mobile'],
+      email: json['email'],
+      siteId: json['site_id'],
+      createdAt: json['created_at'],
+      updatedAt: json['updated_at'],
+      deletedAt: json['deleted_at'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'mobile': mobile,
+      'email': email,
+      'site_id': siteId,
+      'created_at': createdAt,
+      'updated_at': updatedAt,
+      'deleted_at': deletedAt,
+    };
+  }
+}
+*/
 
 class ManpowerReport {
   final List<Manpower> data;

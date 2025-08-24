@@ -1651,6 +1651,46 @@ class ApiService {
     });
   }
 
+  // Manpower Management APIs
+  Future<Manpower?> getManPowerWithContractor({
+    required BuildContext context,
+    required String apiToken,
+    required int siteId,
+    required String date,
+    required int contractor_id
+  }) async {
+    return _handleNetworkCall(() async {
+      final response = await http.post(
+        Uri.parse('$baseUrl/getManPower'),
+        body: {
+          'api_token': apiToken,
+          'site_id': siteId.toString(),
+          'date': date,
+          'contractor_id' : contractor_id.toString()
+        },
+      );
+
+      _logApiRequest(url: "getManPowerWithContractor", method: "GET" );
+      _logApiResponse(response);
+
+      final data = _handleResponse(response, context);
+
+      // Check if data exists, return null if no data found
+      if (data['data'] == null || data['data'] == '') {
+        return null;
+      }
+
+      try {
+        return Manpower.fromJson(data['data']);
+      } catch (e) {
+        log('Error parsing manpower data: $e');
+        log('Data received: ${data['data']}');
+        throw ApiException('Invalid data format received from server',
+            statusCode: 500);
+      }
+    });
+  }
+
   Future<ManpowerReport> getManPowerReport({
     required BuildContext context,
     required String apiToken,
