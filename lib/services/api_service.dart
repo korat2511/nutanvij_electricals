@@ -1613,8 +1613,8 @@ class ApiService {
     });
   }
 
-  // Manpower Management APIs
-  Future<Manpower?> getManPower({
+// Manpower Management APIs
+  Future<List<Manpower>> getManPower({
     required BuildContext context,
     required String apiToken,
     required int siteId,
@@ -1630,18 +1630,19 @@ class ApiService {
         },
       );
 
-      _logApiRequest(url: "getManPower", method: "GET" );
+      _logApiRequest(url: "getManPower", method: "POST");
       _logApiResponse(response);
 
       final data = _handleResponse(response, context);
 
-      // Check if data exists, return null if no data found
-      if (data['data'] == null || data['data'] == '') {
-        return null;
+      // If data is null or empty, return empty list
+      if (data['data'] == null || (data['data'] as List).isEmpty) {
+        return <Manpower>[];
       }
 
       try {
-        return Manpower.fromJson(data['data']);
+        final List<dynamic> manpowerList = data['data'];
+        return manpowerList.map((e) => Manpower.fromJson(e)).toList();
       } catch (e) {
         log('Error parsing manpower data: $e');
         log('Data received: ${data['data']}');
@@ -1651,8 +1652,8 @@ class ApiService {
     });
   }
 
-  // Manpower Management APIs
-  Future<Manpower?> getManPowerWithContractor({
+// Manpower Management APIs
+  Future<List<Manpower>> getManPowerWithContractor({
     required BuildContext context,
     required String apiToken,
     required int siteId,
@@ -1666,22 +1667,23 @@ class ApiService {
           'api_token': apiToken,
           'site_id': siteId.toString(),
           'date': date,
-          'contractor_id' : contractor_id.toString()
+          'contractor_id': contractor_id.toString()
         },
       );
 
-      _logApiRequest(url: "getManPowerWithContractor", method: "GET" );
+      _logApiRequest(url: "getManPowerWith", method: "POST");
       _logApiResponse(response);
 
       final data = _handleResponse(response, context);
 
-      // Check if data exists, return null if no data found
-      if (data['data'] == null || data['data'] == '') {
-        return null;
+      // If data is null or empty, return empty list
+      if (data['data'] == null || (data['data'] as List).isEmpty) {
+        return <Manpower>[];
       }
 
       try {
-        return Manpower.fromJson(data['data']);
+        final List<dynamic> manpowerList = data['data'];
+        return manpowerList.map((e) => Manpower.fromJson(e)).toList();
       } catch (e) {
         log('Error parsing manpower data: $e');
         log('Data received: ${data['data']}');
