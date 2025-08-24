@@ -207,7 +207,8 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
     try {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       final dateString = DateFormat('yyyy-MM-dd').format(_selectedDate);
-      
+
+      print("_selectedContractorId $_selectedContractorId");
       final manpower = await ApiService().storeManPower(
         context: context,
         apiToken: userProvider.user?.data.apiToken ?? '',
@@ -218,7 +219,7 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
         shift: _selectedShift,
         skillPayPerHead: double.parse(_skillPayController.text),
         unskillPayPerHead: double.parse(_unskillPayController.text),
-        contactorId: _selectedContractorId
+          contractor_id: _selectedContractorId
       );
 
       setState(() {

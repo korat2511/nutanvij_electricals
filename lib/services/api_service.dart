@@ -163,6 +163,25 @@ class ApiService {
     }
   }
 
+  void _logApiRequest({
+    required String url,
+    required String method,
+    Map<String, String>? headers,
+    Map<String, dynamic>? body,
+  }) {
+    log('📤 API REQUEST');
+    log('➡️ URL: $url');
+    log('➡️ METHOD: $method');
+    if (headers != null && headers.isNotEmpty) log('➡️ HEADERS: $headers');
+    if (body != null && body.isNotEmpty) log('➡️ BODY: $body');
+  }
+
+  void _logApiResponse(http.Response response) {
+    log('📥 API RESPONSE');
+    log('⬅️ STATUS: ${response.statusCode}');
+    log('⬅️ BODY: ${response.body}');
+  }
+
   Future<UserModel> login(String mobile, String password) async {
     // Get device ID
     final deviceInfo = DeviceInfoPlugin();
@@ -1610,6 +1629,10 @@ class ApiService {
           'date': date,
         },
       );
+
+      _logApiRequest(url: "getManPower", method: "GET" );
+      _logApiResponse(response);
+
       final data = _handleResponse(response, context);
 
       // Check if data exists, return null if no data found
@@ -1676,23 +1699,35 @@ class ApiService {
     required int shift,
     required double skillPayPerHead,
     required double unskillPayPerHead,
-    required int contactorId
+    required int contractor_id
   }) async {
     return _handleNetworkCall(() async {
-      final response = await http.post(
-        Uri.parse('$baseUrl/storeManPower'),
-        body: {
-          'api_token': apiToken,
-          'site_id': siteId.toString(),
-          'date': date,
-          'skill_worker': skillWorker.toString(),
-          'unskill_worker': unskillWorker.toString(),
-          'shift': shift.toString(),
-          'skill_pay_per_head': skillPayPerHead.toString(),
-          'unskill_pay_per_head': unskillPayPerHead.toString(),
-          'contractor_id' : contactorId.toString()
-        },
+      final url = '$baseUrl/storeManPower';
+
+      final body = {
+        'api_token': apiToken,
+        'site_id': siteId.toString(),
+        'date': date,
+        'skill_worker': skillWorker.toString(),
+        'unskill_worker': unskillWorker.toString(),
+        'shift': shift.toString(),
+        'skill_pay_per_head': skillPayPerHead.toString(),
+        'unskill_pay_per_head': unskillPayPerHead.toString(),
+        'contractor_id' : contractor_id.toString()
+      };
+
+      // Log request
+      _logApiRequest(
+        url: url,
+        method: 'POST',
+        body: body,
       );
+      final response = await http.post(Uri.parse(url), body: body);
+
+      // Log response
+      _logApiResponse(response);
+
+
       final data = _handleResponse(response, context);
 
       try {
