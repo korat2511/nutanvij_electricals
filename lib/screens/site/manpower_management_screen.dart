@@ -61,6 +61,7 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   int _selectedContractorId = -1;
+  int _selectedContractorIdDateRange = -1;
   bool _isAddingMore = false;
 
   List<Manpower> _currentManpowerList = [];
@@ -395,6 +396,8 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
   }
 
   Widget _buildRangeReportTab() {
+    final contractorProvider = Provider.of<ContractorProvider>(context);
+
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -459,6 +462,81 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
             ],
           ),
 
+          const SizedBox(height: 16),
+          GestureDetector(
+            onTap: contractorProvider.isLoading
+                ? null
+                : () async {
+              final selectedId = await showModalBottomSheet<int>(
+                context: context,
+                isScrollControlled: true,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(16)),
+                ),
+                builder: (context) => ContractorBottomSheet(
+                  contractors: contractorProvider.contractors,
+                  selectedId: _selectedContractorIdDateRange,
+                  onAddContractor: () async {
+                    await showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.vertical(
+                            top: Radius.circular(20)),
+                      ),
+                      backgroundColor: Colors.white,
+                      builder: (context) {
+                        return AddContractorSheet(
+                          onAdd: (name, email, phone) async {
+                            await _addContractor(
+                                name, email, phone);
+                          },
+                        );
+                      },
+                    );
+                  },
+                ),
+              );
+
+              if (selectedId != null) {
+                setState(() {
+                  _selectedContractorIdDateRange = selectedId;
+                });
+
+                // 🔥 Call API again after selecting contractor
+                _loadCurrentDateManpowerContractor(
+                    _selectedContractorIdDateRange);
+              }
+            },
+            child: AbsorbPointer(
+              child: CustomTextField(
+                controller: TextEditingController(
+                  text: contractorProvider.contractors
+                      .firstWhere(
+                        (c) => c.id == _selectedContractorIdDateRange,
+                    orElse: () => Contractor(
+                      id: 0,
+                      name: '',
+                      mobile: '',
+                      email: '',
+                      siteId: 0,
+                      deletedAt: null,
+                      createdAt: '',
+                      updatedAt: '',
+                    ),
+                  )
+                      .name,
+                ),
+                label: 'Select Contractor',
+                readOnly: true,
+                suffixIcon: const Icon(
+                  Icons.arrow_drop_down,
+                  color: AppColors.primary, // set color here
+                ),
+              ),
+            ),
+          ),
           const SizedBox(height: 16),
 
           CustomButton(
