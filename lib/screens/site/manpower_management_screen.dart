@@ -68,6 +68,7 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
 
   int _selectedContractorId2 = -1;
   bool _isAddingMore = false;
+  bool _isAddingMoreButton = false;
 
 
   final TextEditingController _skillWorkerController2 = TextEditingController();
@@ -343,7 +344,8 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
         _selectedContractorId2 = -1; // Reset editing state
 
         if(_currentManpowerList != null && _currentManpowerList.length > 0) {
-          _isAddingMore = true;
+          _isAddingMore = false;
+          _isAddingMoreButton = false;
         }
       });
 
@@ -525,6 +527,7 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
             onTap: contractorProvider.isLoading
                 ? null
                 : () async {
+
               final selectedId = await showModalBottomSheet<int>(
                 context: context,
                 isScrollControlled: true,
@@ -937,7 +940,7 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
               ),
             ),
 
-          if(_isAddingMore)
+          if(_isAddingMore && _isAddingMoreButton)
             Form(
               key: _formKey2,
               child: Column(
@@ -948,6 +951,13 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
                     onTap: contractorProvider.isLoading
                         ? null
                         : () async {
+
+
+                      final usedContractorIds = _currentManpowerList.map((m) => m.contractor?.id).whereType<int>().toSet();
+                      final availableContractors = contractorProvider.contractorsFiltered
+                          .where((c) => !usedContractorIds.contains(c.id))
+                          .toList();
+
                       final selectedId = await showModalBottomSheet<int>(
                         context: context,
                         isScrollControlled: true,
@@ -956,7 +966,7 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
                               top: Radius.circular(16)),
                         ),
                         builder: (context) => ContractorBottomSheet(
-                          contractors: contractorProvider.contractors,
+                          contractors: availableContractors,
                           selectedId: _selectedContractorId2,
                           onAddContractor: () async {
                             await showModalBottomSheet(
@@ -985,15 +995,13 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
                           _selectedContractorId2 = selectedId;
                         });
 
-                        // 🔥 Call API again after selecting contractor
-                        _loadCurrentDateManpowerContractor(
-                            _selectedContractorId2);
+
                       }
                     },
                     child: AbsorbPointer(
                       child: CustomTextField(
                         controller: TextEditingController(
-                          text: contractorProvider.contractors
+                          text: contractorProvider.contractorsFiltered
                               .firstWhere(
                                 (c) => c.id == _selectedContractorId2,
                             orElse: () => Contractor(
@@ -1171,13 +1179,14 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
 
           if (_currentManpowerList != null && _currentManpowerList.length > 0 && !_isEditing)
             Visibility(
-              visible: _isAddingMore ? false : true,
+              visible: _isAddingMoreButton ? false : true,
               child: CustomButton(
                 text: 'Add More',
                 onPressed: () {
                   setState(() {
                     _isEditing = true;
                     _isAddingMore = true;
+                    _isAddingMoreButton = true;
                     _clearForm(); // reset form for new entry
                   });
                 },

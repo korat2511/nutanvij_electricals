@@ -7,10 +7,14 @@ import '../../../services/api_service.dart';
 
 class ContractorProvider with ChangeNotifier {
   List<Contractor> _contractors = [];
+
+  List<Contractor> _contractorsFiltered = [];
+
   bool _isLoading = false;
   String? _error;
 
   List<Contractor> get contractors => _contractors;
+  List<Contractor> get contractorsFiltered => _contractorsFiltered;
   bool get isLoading => _isLoading;
   String? get error => _error;
 
@@ -19,6 +23,7 @@ class ContractorProvider with ChangeNotifier {
     required String siteId,
     required UserProvider userProvider,
   }) async {
+
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -31,6 +36,7 @@ class ContractorProvider with ChangeNotifier {
       );
 
       _contractors = result;
+      _contractorsFiltered = result;
       _isLoading = false;
       notifyListeners();
     } catch (e) {
