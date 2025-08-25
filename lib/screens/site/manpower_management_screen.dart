@@ -59,13 +59,24 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
 
   // Form validation
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final GlobalKey<FormState> _formKey2 = GlobalKey<FormState>();
 
   int _selectedContractorId = -1;
   int _selectedContractorIdDateRange = -1;
-  bool _isAddingMore = false;
 
   List<Manpower> _currentManpowerList = [];
 
+  int _selectedContractorId2 = -1;
+  bool _isAddingMore = false;
+
+
+  final TextEditingController _skillWorkerController2 = TextEditingController();
+  final TextEditingController _unskillWorkerController2 =
+  TextEditingController();
+  final TextEditingController _skillPayController2 = TextEditingController();
+  final TextEditingController _unskillPayController2 = TextEditingController();
+
+  int _selectedShift2 = 1;
 
   @override
   void initState() {
@@ -287,6 +298,53 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
         _isLoading = false;
         _isEditing = false;
         _selectedContractorId = -1; // Reset editing state
+      });
+
+      SnackBarUtils.showSuccess(context, 'Manpower data saved successfully!');
+      _loadCurrentDateManpower();
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+      SnackBarUtils.showError(context, e.toString());
+    }
+  }
+
+  Future<void> _saveManpower2() async {
+    if (!_formKey2.currentState!.validate()) return;
+
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final dateString = DateFormat('yyyy-MM-dd').format(_selectedDate);
+
+      print("_selectedContractorId $_selectedContractorId2");
+      final manpower = await ApiService().storeManPower(
+          context: context,
+          apiToken: userProvider.user?.data.apiToken ?? '',
+          siteId: widget.site.id,
+          date: dateString,
+          skillWorker: int.parse(_skillWorkerController2.text),
+          unskillWorker: int.parse(_unskillWorkerController2.text),
+          shift: _selectedShift2,
+          skillPayPerHead: double.parse(_skillPayController2.text),
+          unskillPayPerHead: double.parse(_unskillPayController2.text),
+          contractor_id: _selectedContractorId2);
+
+      setState(() {
+        _currentManpower = manpower;
+        _isLoading = false;
+        _isEditing = false;
+        _selectedContractorId2 = -1; // Reset editing state
+
+        if(_currentManpowerList != null && _currentManpowerList.length > 0) {
+          _isAddingMore = true;
+        }
       });
 
       SnackBarUtils.showSuccess(context, 'Manpower data saved successfully!');
@@ -878,17 +936,253 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
                 ],
               ),
             ),
-          if (_currentManpower != null && !_isEditing)
-            CustomButton(
-              text: 'Add More',
-              onPressed: () {
-                setState(() {
-                  _isEditing = true;
-                  _isAddingMore = true;
-                  _clearForm(); // reset form for new entry
-                });
-              },
-              backgroundColor: AppColors.primary.withOpacity(0.8),
+
+          if(_isAddingMore)
+            Form(
+              key: _formKey2,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Contractor Dropdown
+                  GestureDetector(
+                    onTap: contractorProvider.isLoading
+                        ? null
+                        : () async {
+                      final selectedId = await showModalBottomSheet<int>(
+                        context: context,
+                        isScrollControlled: true,
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.vertical(
+                              top: Radius.circular(16)),
+                        ),
+                        builder: (context) => ContractorBottomSheet(
+                          contractors: contractorProvider.contractors,
+                          selectedId: _selectedContractorId2,
+                          onAddContractor: () async {
+                            await showModalBottomSheet(
+                              context: context,
+                              isScrollControlled: true,
+                              shape: const RoundedRectangleBorder(
+                                borderRadius: BorderRadius.vertical(
+                                    top: Radius.circular(20)),
+                              ),
+                              backgroundColor: Colors.white,
+                              builder: (context) {
+                                return AddContractorSheet(
+                                  onAdd: (name, email, phone) async {
+                                    await _addContractor(
+                                        name, email, phone);
+                                  },
+                                );
+                              },
+                            );
+                          },
+                        ),
+                      );
+
+                      if (selectedId != null) {
+                        setState(() {
+                          _selectedContractorId2 = selectedId;
+                        });
+
+                        // 🔥 Call API again after selecting contractor
+                        _loadCurrentDateManpowerContractor(
+                            _selectedContractorId2);
+                      }
+                    },
+                    child: AbsorbPointer(
+                      child: CustomTextField(
+                        controller: TextEditingController(
+                          text: contractorProvider.contractors
+                              .firstWhere(
+                                (c) => c.id == _selectedContractorId2,
+                            orElse: () => Contractor(
+                              id: 0,
+                              name: '',
+                              mobile: '',
+                              email: '',
+                              siteId: 0,
+                              deletedAt: null,
+                              createdAt: '',
+                              updatedAt: '',
+                            ),
+                          )
+                              .name,
+                        ),
+                        label: 'Select Contractor 2',
+                        readOnly: true,
+                        suffixIcon: const Icon(
+                          Icons.arrow_drop_down,
+                          color: AppColors.primary, // set color here
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Skilled Worker Field
+                  CustomTextField(
+                    controller: _skillWorkerController2,
+                    label: '2 Skilled Workers (Enter number of skilled workers)',
+                    keyboardType: TextInputType.number,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter number of skilled workers';
+                      }
+                      if (int.tryParse(value) == null) {
+                        return 'Please enter a valid number';
+                      }
+                      if (int.parse(value) < 0) {
+                        return 'Number cannot be negative';
+                      }
+                      return null;
+                    },
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  CustomTextField(
+                    controller: _unskillWorkerController2,
+                    label:
+                    '2 Unskilled Workers (Enter number of unskilled workers)',
+                    keyboardType: TextInputType.number,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter number of unskilled workers';
+                      }
+                      if (int.tryParse(value) == null) {
+                        return 'Please enter a valid number';
+                      }
+                      if (int.parse(value) < 0) {
+                        return 'Number cannot be negative';
+                      }
+                      return null;
+                    },
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  CustomTextField(
+                    controller: _skillPayController2,
+                    label:
+                    '2 Skilled Worker Pay (₹/head) (Enter pay per skilled worker)',
+                    keyboardType: TextInputType.number,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter pay per skilled worker';
+                      }
+                      if (double.tryParse(value) == null) {
+                        return 'Please enter a valid amount';
+                      }
+                      if (double.parse(value) < 0) {
+                        return 'Amount cannot be negative';
+                      }
+                      return null;
+                    },
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  CustomTextField(
+                    controller: _unskillPayController2,
+                    label:
+                    '2 Unskilled Worker Pay (₹/head) (Enter pay per unskilled worker)',
+                    keyboardType: TextInputType.number,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter pay per unskilled worker';
+                      }
+                      if (double.tryParse(value) == null) {
+                        return 'Please enter a valid amount';
+                      }
+                      if (double.parse(value) < 0) {
+                        return 'Amount cannot be negative';
+                      }
+                      return null;
+                    },
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Shift Selection
+                  Text(
+                    'Shift',
+                    style: AppTypography.bodyMedium
+                        .copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppColors.primary),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: DropdownButtonFormField<int>(
+                      value: _selectedShift2,
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        contentPadding:
+                        EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 1, child: Text('Day')),
+                        DropdownMenuItem(value: 2, child: Text('Night')),
+                        DropdownMenuItem(value: 3, child: Text('Day & Night')),
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedShift2 = value!;
+                        });
+                      },
+                    ),
+                  ),
+
+                  const SizedBox(height: 32),
+
+                  // Action Buttons
+                  Row(
+                    children: [
+                      if (_isEditing) ...[
+                        Expanded(
+                          child: CustomButton(
+                            text: 'Cancel',
+                            onPressed: () {
+                              setState(() {
+                                _isEditing = false;
+                              });
+                              _clearForm();
+                            },
+                            backgroundColor: Colors.grey,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                      ],
+                      Expanded(
+                        child: CustomButton(
+                          text: '2 Save Manpower',
+                          onPressed: _saveManpower2,
+                          isLoading: _isLoading,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+          if (_currentManpowerList != null && _currentManpowerList.length > 0 && !_isEditing)
+            Visibility(
+              visible: _isAddingMore ? false : true,
+              child: CustomButton(
+                text: 'Add More',
+                onPressed: () {
+                  setState(() {
+                    _isEditing = true;
+                    _isAddingMore = true;
+                    _clearForm(); // reset form for new entry
+                  });
+                },
+                backgroundColor: AppColors.primary.withOpacity(0.8),
+              ),
             ),
 
           const SizedBox(height: 16),
