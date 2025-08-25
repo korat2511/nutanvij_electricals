@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/utils/snackbar_utils.dart';
 import '../../../models/contractor.dart';
 import '../../../providers/user_provider.dart';
 import '../../../services/api_service.dart';
@@ -81,4 +82,32 @@ class ContractorProvider with ChangeNotifier {
       notifyListeners();
     }
   }
+
+  Future<void> addNewContractor({
+    required BuildContext context,
+    required String apiToken,
+    required String siteId,
+    required String name,
+    required String mobile,
+    required String email,
+  }) async {
+    await addContractor(
+      context: context,
+      apiToken: apiToken,
+      siteId: siteId,
+      name: name,
+      mobile: mobile,
+      email: email,
+    );
+
+    if (context.mounted) {
+      SnackBarUtils.showSuccess(context, 'Contractor added successfully!');
+    }
+
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+
+    await fetchContractors(siteId: siteId, context: context, userProvider: userProvider);
+    notifyListeners();
+  }
+
 }

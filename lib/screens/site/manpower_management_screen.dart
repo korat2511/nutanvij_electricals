@@ -338,7 +338,7 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
           contractor_id: _selectedContractorId2);
 
       setState(() {
-        _currentManpower = manpower;
+        // _currentManpower = manpower;
         _isLoading = false;
         _isEditing = false;
         _selectedContractorId2 = -1; // Reset editing state
@@ -651,8 +651,7 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
                       context: context,
                       initialDate: _selectedDate,
                       firstDate: DateTime(2020),
-                      lastDate: DateTime(2030),
-                    );
+                      lastDate: DateTime.now(),                    );
                     if (picked != null) {
                       setState(() {
                         _selectedDate = picked;
@@ -1017,7 +1016,7 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
                           )
                               .name,
                         ),
-                        label: 'Select Contractor 2',
+                        label: 'Select Contractor',
                         readOnly: true,
                         suffixIcon: const Icon(
                           Icons.arrow_drop_down,
@@ -1031,7 +1030,7 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
                   // Skilled Worker Field
                   CustomTextField(
                     controller: _skillWorkerController2,
-                    label: '2 Skilled Workers (Enter number of skilled workers)',
+                    label: 'Skilled Workers (Enter number of skilled workers)',
                     keyboardType: TextInputType.number,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -1052,7 +1051,7 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
                   CustomTextField(
                     controller: _unskillWorkerController2,
                     label:
-                    '2 Unskilled Workers (Enter number of unskilled workers)',
+                    'Unskilled Workers (Enter number of unskilled workers)',
                     keyboardType: TextInputType.number,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -1073,7 +1072,7 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
                   CustomTextField(
                     controller: _skillPayController2,
                     label:
-                    '2 Skilled Worker Pay (₹/head) (Enter pay per skilled worker)',
+                    'Skilled Worker Pay (₹/head) (Enter pay per skilled worker)',
                     keyboardType: TextInputType.number,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -1094,7 +1093,7 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
                   CustomTextField(
                     controller: _unskillPayController2,
                     label:
-                    '2 Unskilled Worker Pay (₹/head) (Enter pay per unskilled worker)',
+                    'Unskilled Worker Pay (₹/head) (Enter pay per unskilled worker)',
                     keyboardType: TextInputType.number,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -1166,7 +1165,7 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
                       ],
                       Expanded(
                         child: CustomButton(
-                          text: '2 Save Manpower',
+                          text: 'Save Manpower',
                           onPressed: _saveManpower2,
                           isLoading: _isLoading,
                         ),
@@ -1486,9 +1485,9 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
   Future<void> _addContractor(String name, String email, String phone) async {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     final contractorProvider =
-        Provider.of<ContractorProvider>(context, listen: false);
+    Provider.of<ContractorProvider>(context, listen: false);
 
-    await contractorProvider.addContractor(
+    await contractorProvider.addNewContractor(
       context: context,
       apiToken: userProvider.user?.data.apiToken ?? '',
       siteId: widget.site.id.toString(),
@@ -1497,8 +1496,5 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
       email: email,
     );
 
-    if (mounted) {
-      SnackBarUtils.showSuccess(context, 'Contractor added successfully!');
-    }
   }
 }
