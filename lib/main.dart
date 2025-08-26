@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:nutanvij_electricals/screens/home/home_screen.dart';
+import 'package:nutanvij_electricals/screens/home/providers/location_provider.dart';
 import 'package:nutanvij_electricals/screens/inventory/providers/create_transporter_provider.dart';
 import 'package:nutanvij_electricals/screens/inventory/providers/download_report_provider.dart';
 import 'package:nutanvij_electricals/screens/inventory/providers/edit_transporter_provider.dart';
@@ -146,6 +147,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         ChangeNotifierProvider(create: (_) => TransporterFairProvider()),
         ChangeNotifierProvider(create: (_) => DownloadReportProvider()),
         ChangeNotifierProvider(create: (_) => ContractorProvider()),
+        ChangeNotifierProvider(create: (_) => LocationProvider()),
 
 
       ],
