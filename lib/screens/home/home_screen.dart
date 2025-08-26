@@ -423,7 +423,9 @@ class _HomeScreenState extends State<HomeScreen> {
       Provider.of<LocationProvider>(context, listen: false);
 
       // Start tracking when screen opens
-      locationProvider.startTracking(userId);
+      locationProvider.startTracking(userId, context);
+
+
     }
 
     // Check for auto checkout validation when app starts (with delay to ensure data is loaded)
@@ -432,13 +434,18 @@ class _HomeScreenState extends State<HomeScreen> {
         _checkAutoCheckoutOnAppStart();
       }
     });
+
   }
+
+
+
 
   @override
   void dispose() {
     // Stop auto checkout monitoring when leaving the screen
     AutoCheckoutService.instance.stopMonitoring();
 
+    //TODO
     //stop tracking
     // Provider.of<LocationProvider>(context, listen: false).stopTracking();
 

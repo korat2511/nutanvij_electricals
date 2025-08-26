@@ -174,6 +174,7 @@ class ApiService {
     log('➡️ METHOD: $method');
     if (headers != null && headers.isNotEmpty) log('➡️ HEADERS: $headers');
     if (body != null && body.isNotEmpty) log('➡️ BODY: $body');
+
   }
 
   void _logApiResponse(http.Response response) {

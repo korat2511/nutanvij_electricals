@@ -2,13 +2,16 @@ import 'dart:async';
 import 'dart:developer';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 
+import 'package:geolocator/geolocator.dart' as geo;
+
+import '../../../core/utils/snackbar_utils.dart';
+
 class LocationProvider with ChangeNotifier {
-  Position? _lastPosition;
+  geo.Position? _lastPosition;
   DateTime? _lastMovementTime;
-  StreamSubscription<Position>? _positionStream;
+  StreamSubscription<geo.Position>? _positionStream;
 
   bool _isTracking = false;
   String? _userId;
@@ -16,24 +19,24 @@ class LocationProvider with ChangeNotifier {
   bool get isTracking => _isTracking;
 
   /// Start tracking for this user
-  Future<void> startTracking(String userId) async {
+  Future<void> startTracking(String userId,BuildContext context) async {
     _userId = userId;
 
-    final permission = await Geolocator.requestPermission();
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
+    final permission = await geo.Geolocator.requestPermission();
+    if (permission == geo.LocationPermission.denied ||
+        permission == geo.LocationPermission.deniedForever) {
       throw Exception("Location permission denied");
     }
 
     _isTracking = true;
     _lastMovementTime = DateTime.now();
 
-    _positionStream = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
+    _positionStream = geo.Geolocator.getPositionStream(
+      locationSettings: const geo.LocationSettings(
+        accuracy: geo.LocationAccuracy.high,
         distanceFilter: 50, // check every 50 meters
       ),
-    ).listen((pos) => _handlePosition(pos));
+    ).listen((pos) => _handlePosition(pos, context));
 
     notifyListeners();
   }
@@ -45,15 +48,15 @@ class LocationProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _handlePosition(Position pos) async {
+  Future<void> _handlePosition(geo.Position pos, BuildContext context) async {
     if (_lastPosition == null) {
       _lastPosition = pos;
       _lastMovementTime = DateTime.now();
-      await _saveLog(pos, "Movement start");
+      await _saveLog(pos, "Movement start", context);
       return;
     }
 
-    final distance = Geolocator.distanceBetween(
+    final distance = geo.Geolocator.distanceBetween(
       _lastPosition!.latitude,
       _lastPosition!.longitude,
       pos.latitude,
@@ -68,18 +71,18 @@ class LocationProvider with ChangeNotifier {
         now.difference(_lastMovementTime!).inMinutes >= 2) {
       _lastMovementTime = now;
       _lastPosition = pos;
-      await _saveLog(pos, "Periodic log (moved $distance m)");
+      await _saveLog(pos, "Periodic log (moved $distance m)",context);
     }
 
     // If no movement for 10 min
     if (distance < 50 &&
         now.difference(_lastMovementTime!).inMinutes >= 10) {
-      await _saveLog(pos, "User idle, stop tracking");
+      await _saveLog(pos, "User idle, stop tracking", context);
       stopTracking();
     }
   }
 
-  Future<void> _saveLog(Position pos, String note) async {
+  Future<void> _saveLog(geo.Position pos, String note, BuildContext context) async {
     if (_userId == null) return;
 
     String address = "Unknown";
@@ -90,10 +93,13 @@ class LocationProvider with ChangeNotifier {
         final p = placemarks.first;
         address = "${p.street}, ${p.locality}, ${p.country}";
         print('address live tracking :: $address');
+
       }
     } catch (e) {
       log("Error fetching address: $e");
     }
+
+    SnackBarUtils.showSuccess(context, 'note :: $note Address :: $address');
 
     await FirebaseFirestore.instance
         .collection("users")
@@ -107,4 +113,9 @@ class LocationProvider with ChangeNotifier {
       "note": note,
     });
   }
+
+
+
 }
+
+

@@ -38,6 +38,8 @@ dependencies:
   open_file: ^3.3.2
   url_launcher: ^6.3.2
   month_picker_dialog: ^6.5.0
+#  background_locator_2: ^2.0.6
+
 #  timeline_tile: ^2.0.0
 #  rename_app: ^1.6.3
 
