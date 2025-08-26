@@ -123,17 +123,19 @@ class LocationProvider with ChangeNotifier {
     // ✅ Snackbar every log
     SnackBarUtils.showSuccess(context, 'Note: $note\nAddress: $address');
 
-    await FirebaseFirestore.instance
-        .collection("users")
-        .doc(_userId)
-        .collection("location_track_history")
-        .add({
-      "lat": pos.latitude,
-      "long": pos.longitude,
-      "address": address,
-      "time": DateTime.now().toIso8601String(),
-      "note": note,
-    });
+    if (!_isIdle) {
+      await FirebaseFirestore.instance
+          .collection("users")
+          .doc(_userId)
+          .collection("location_track_history")
+          .add({
+        "lat": pos.latitude,
+        "long": pos.longitude,
+        "address": address,
+        "time": DateTime.now().toIso8601String(),
+        "note": note,
+      });
+    }
   }
 }
 
