@@ -13,13 +13,16 @@ class LocationProvider with ChangeNotifier {
   DateTime? _lastMovementTime;
   StreamSubscription<geo.Position>? _positionStream;
 
+  Timer? _testTimer; // 🔹 new timer
+
   bool _isTracking = false;
   String? _userId;
+  bool _isIdle = false; // Track idle state
 
   bool get isTracking => _isTracking;
 
-  /// Start tracking for this user
-  Future<void> startTracking(String userId,BuildContext context) async {
+  /// Start tracking
+  Future<void> startTracking(String userId, BuildContext context) async {
     _userId = userId;
 
     final permission = await geo.Geolocator.requestPermission();
@@ -38,6 +41,13 @@ class LocationProvider with ChangeNotifier {
       ),
     ).listen((pos) => _handlePosition(pos, context));
 
+/*    // 🔹 TEST MODE: show log every 5 seconds
+    _testTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
+      if (_lastPosition != null) {
+        await _saveLog(_lastPosition!, "5-sec test log", context);
+      }
+    });*/
+
     notifyListeners();
   }
 
@@ -45,13 +55,17 @@ class LocationProvider with ChangeNotifier {
   Future<void> stopTracking() async {
     await _positionStream?.cancel();
     _isTracking = false;
+    _isIdle = false;
     notifyListeners();
   }
 
-  Future<void> _handlePosition(geo.Position pos, BuildContext context) async {
+  Future<void> _handlePosition(
+      geo.Position pos, BuildContext context) async {
+    final now = DateTime.now();
+
     if (_lastPosition == null) {
       _lastPosition = pos;
-      _lastMovementTime = DateTime.now();
+      _lastMovementTime = now;
       await _saveLog(pos, "Movement start", context);
       return;
     }
@@ -63,26 +77,34 @@ class LocationProvider with ChangeNotifier {
       pos.longitude,
     );
 
-    print('➡️ lat ::${_lastPosition!.latitude} ');
-    print('➡️ lng ::${_lastPosition!.longitude} ');
-    final now = DateTime.now();
+    // 🔹 If user was idle but now moved 300m → resume logging
+    if (_isIdle && distance >= 300) {
+      _isIdle = false;
+      _lastPosition = pos;
+      _lastMovementTime = now;
+      await _saveLog(pos, "Movement resumed after idle", context);
+      return;
+    }
 
+    // 🔹 Every 2 min OR 300m log
     if (distance >= 300 ||
         now.difference(_lastMovementTime!).inMinutes >= 2) {
       _lastMovementTime = now;
       _lastPosition = pos;
-      await _saveLog(pos, "Periodic log (moved $distance m)",context);
+      await _saveLog(pos, "Periodic log (moved $distance m)", context);
     }
 
-    // If no movement for 10 min
-    if (distance < 50 &&
+    // 🔹 If idle for 10 min
+    if (!_isIdle &&
+        distance < 50 &&
         now.difference(_lastMovementTime!).inMinutes >= 10) {
-      await _saveLog(pos, "User idle, stop tracking", context);
-      stopTracking();
+      _isIdle = true;
+      await _saveLog(pos, "User idle for 10 min → stop logging", context);
     }
   }
 
-  Future<void> _saveLog(geo.Position pos, String note, BuildContext context) async {
+  Future<void> _saveLog(
+      geo.Position pos, String note, BuildContext context) async {
     if (_userId == null) return;
 
     String address = "Unknown";
@@ -93,13 +115,13 @@ class LocationProvider with ChangeNotifier {
         final p = placemarks.first;
         address = "${p.street}, ${p.locality}, ${p.country}";
         print('address live tracking :: $address');
-
       }
     } catch (e) {
       log("Error fetching address: $e");
     }
 
-    SnackBarUtils.showSuccess(context, 'note :: $note Address :: $address');
+    // ✅ Snackbar every log
+    SnackBarUtils.showSuccess(context, 'Note: $note\nAddress: $address');
 
     await FirebaseFirestore.instance
         .collection("users")
@@ -113,9 +135,6 @@ class LocationProvider with ChangeNotifier {
       "note": note,
     });
   }
-
-
-
 }
 
 
