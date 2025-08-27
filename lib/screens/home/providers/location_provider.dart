@@ -94,6 +94,14 @@ class LocationProvider with ChangeNotifier {
       await _saveLog(pos, "Periodic log (moved $distance m)", context);
     }
 
+    // 🔹 NEW: show snackbar/log every 30 seconds testing
+/*    _testTimer?.cancel(); // clear old if any
+    _testTimer = Timer.periodic(const Duration(seconds: 30), (timer) async {
+      if (_lastPosition != null && !_isIdle) {
+        await _saveLog(_lastPosition!, "30-sec periodic log", context);
+      }
+    });*/
+
     // 🔹 If idle for 10 min
     if (!_isIdle &&
         distance < 50 &&
