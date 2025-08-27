@@ -14,10 +14,9 @@ class LocationService {
       androidConfiguration: AndroidConfiguration(
         onStart: onStart,
         isForegroundMode: true,
-        autoStart: true,
-        notificationChannelId: 'location_tracking',
-        initialNotificationTitle: 'Location Service Running',
-        initialNotificationContent: 'Tracking in background...',
+        notificationChannelId: 'my_foreground',
+        initialNotificationTitle: 'App is running',
+        initialNotificationContent: 'Tracking location in background',
         foregroundServiceNotificationId: 888,
       ),
       iosConfiguration: IosConfiguration(
@@ -26,6 +25,7 @@ class LocationService {
         onBackground: onIosBackground,
       ),
     );
+
 
     service.startService();
   }

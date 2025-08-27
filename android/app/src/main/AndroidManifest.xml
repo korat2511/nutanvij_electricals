@@ -20,6 +20,7 @@
 
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
 
 
     <application
@@ -58,6 +59,18 @@
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyBdsNUr3ZUSZH63Mb2brR1LqAmZnIP94zQ" /> <!-- TODO: Replace with your real API key -->
+
+        <service
+            android:name="id.flutter.flutter_background_service.BackgroundService"
+            android:foregroundServiceType="location"
+            android:enabled="true"
+            android:exported="true" />
+
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@mipmap/ic_launcher" />
+
+
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
