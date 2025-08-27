@@ -13,6 +13,7 @@ import 'package:nutanvij_electricals/screens/splash_screen.dart';
 import 'package:nutanvij_electricals/screens/task/task_list_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'core/utils/location_service/location_service.dart';
 import 'core/utils/navigation_utils.dart';
 import 'firebase_options.dart';
 import 'providers/user_provider.dart';
@@ -45,6 +46,7 @@ void main() async{
     print('App opened from terminated state: ${initialMessage.data}');
     _handleNotificationNavigation(initialMessage);
   }
+  await LocationService.initializeService();
 
   runApp(const MyApp());
 }
