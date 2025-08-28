@@ -142,7 +142,7 @@ class ApiService {
     } catch (e) {
       if (e is ApiException) rethrow;
       log("E == $e");
-
+      
       // Provide more specific error messages
       if (e.toString().contains('PathNotFoundException')) {
         throw ApiException(
@@ -235,13 +235,13 @@ class ApiService {
       final response = await http.get(Uri.parse('$baseUrl/getDesignations'));
       final data = _handleResponse(response, null);
 
-      final List<dynamic> designationsJson = data['data'] ?? [];
-      return designationsJson
-          .where((json) => json['status'] == 'Active')
-          .map((json) => Designation.fromJson(json))
-          .toList();
+          final List<dynamic> designationsJson = data['data'] ?? [];
+          return designationsJson
+              .where((json) => json['status'] == 'Active')
+              .map((json) => Designation.fromJson(json))
+              .toList();
     });
-  }
+    }
 
   Future<UserModel> signup({
     required BuildContext context,
@@ -315,7 +315,7 @@ class ApiService {
       }
 
       var request = http.MultipartRequest('POST', Uri.parse('$baseUrl/signUp'));
-
+      
       // Add text fields
       request.fields.addAll({
         'name': name,
@@ -371,7 +371,7 @@ class ApiService {
       var response = await http.Response.fromStream(streamedResponse);
 
       final data = _handleResponse(response, context);
-      return UserModel.fromJson(data);
+        return UserModel.fromJson(data);
     });
   }
 
@@ -466,11 +466,11 @@ class ApiService {
       final response = await http.post(
         Uri.parse('$baseUrl/requestForChangeTime'),
         body: {
-          'api_token': apiToken,
-          'attendance_id': attendanceId,
-          'type': type,
-          'time': time,
-          'reason': reason,
+        'api_token': apiToken,
+        'attendance_id': attendanceId,
+        'type': type,
+        'time': time,
+        'reason': reason,
         },
       );
       return _handleResponse(response, context);
@@ -497,7 +497,7 @@ class ApiService {
         },
       );
       final data = _handleResponse(response, context);
-      return List<Map<String, dynamic>>.from(data['data']);
+        return List<Map<String, dynamic>>.from(data['data']);
     });
   }
 
@@ -536,14 +536,14 @@ class ApiService {
       final response = await http.post(
         Uri.parse('$baseUrl/attendanceRequestList'),
         body: {
-          'api_token': apiToken,
-          'start_date': startDate,
-          'end_date': endDate,
-          'user_id': userId,
+        'api_token': apiToken,
+        'start_date': startDate,
+        'end_date': endDate,
+        'user_id': userId,
         },
       );
       final data = _handleResponse(response, context);
-      return List<Map<String, dynamic>>.from(data['data']);
+        return List<Map<String, dynamic>>.from(data['data']);
     });
   }
 
@@ -585,7 +585,7 @@ class ApiService {
         },
       );
       final data = _handleResponse(response, context);
-      return List<Map<String, dynamic>>.from(data['data']);
+        return List<Map<String, dynamic>>.from(data['data']);
     });
   }
 
@@ -593,7 +593,7 @@ class ApiService {
     return _handleNetworkCall(() async {
       final response = await http.get(Uri.parse('$baseUrl/getDepartment'));
       final data = _handleResponse(response, null);
-      final List<dynamic> departmentsJson = data['data'] ?? [];
+          final List<dynamic> departmentsJson = data['data'] ?? [];
       return departmentsJson.map((json) => Department.fromJson(json)).toList();
     });
   }
@@ -630,10 +630,10 @@ class ApiService {
       final response = await http.post(
         Uri.parse('$baseUrl/changePassword'),
         body: {
-          'api_token': apiToken,
-          'current_password': currentPassword,
-          'new_password': newPassword,
-          'confirm_password': confirmPassword,
+        'api_token': apiToken,
+        'current_password': currentPassword,
+        'new_password': newPassword,
+        'confirm_password': confirmPassword,
         },
       );
       _handleResponse(response, context);
@@ -646,14 +646,14 @@ class ApiService {
     String? userId,
   }) async {
     return _handleNetworkCall(() async {
-      final body = {
-        'api_token': apiToken,
-      };
-      if (userId != null) body['user_id'] = userId;
-      final response = await http.post(
-        Uri.parse('$baseUrl/leaveList'),
-        body: body,
-      );
+    final body = {
+      'api_token': apiToken,
+    };
+    if (userId != null) body['user_id'] = userId;
+    final response = await http.post(
+      Uri.parse('$baseUrl/leaveList'),
+      body: body,
+    );
       final data = _handleResponse(response, context);
       return List<Map<String, dynamic>>.from(data['data']);
     });
@@ -766,14 +766,14 @@ class ApiService {
     String? userId,
   }) async {
     return _handleNetworkCall(() async {
-      final body = {
-        'api_token': apiToken,
-      };
-      if (userId != null) body['user_id'] = userId;
-      final response = await http.post(
-        Uri.parse('$baseUrl/employeeExpenseList'),
-        body: body,
-      );
+    final body = {
+      'api_token': apiToken,
+    };
+    if (userId != null) body['user_id'] = userId;
+    final response = await http.post(
+      Uri.parse('$baseUrl/employeeExpenseList'),
+      body: body,
+    );
       final data = _handleResponse(response, context);
       return List<Map<String, dynamic>>.from(data['data']);
     });
@@ -817,8 +817,8 @@ class ApiService {
       final response = await http.post(
         Uri.parse('$baseUrl/employeeExpenseCancel'),
         body: {
-          'api_token': apiToken,
-          'employee_expense_id': expenseId,
+        'api_token': apiToken,
+        'employee_expense_id': expenseId,
         },
       );
       _handleResponse(response, context);
@@ -970,11 +970,11 @@ class ApiService {
       request.fields['end_date'] = endDate;
       request.fields['min_range'] = minRange.toString();
       request.fields['max_range'] = maxRange.toString();
-
+      
       for (var img in newImagePaths) {
         request.files.add(await http.MultipartFile.fromPath('images[]', img));
       }
-
+      
       var streamedResponse = await request.send();
       var response = await http.Response.fromStream(streamedResponse);
 
@@ -1445,7 +1445,7 @@ class ApiService {
     return _handleNetworkCall(() async {
       var request =
           http.MultipartRequest('POST', Uri.parse('$baseUrl/editProgress'));
-
+      
       request.fields['api_token'] = apiToken;
       request.fields['task_progress_id'] = progressId.toString();
       request.fields['work_done'] = workDone;
@@ -1699,16 +1699,24 @@ class ApiService {
     required int siteId,
     required String startDate,
     required String endDate,
+    int? contractorId,
   }) async {
     return _handleNetworkCall(() async {
+      final Map<String, String> body = {
+        'api_token': apiToken,
+        'site_id': siteId.toString(),
+        'start_date': startDate,
+        'end_date': endDate,
+      };
+      
+      // Add contractor_id if provided
+      if (contractorId != null && contractorId != -1) {
+        body['contractor_id'] = contractorId.toString();
+      }
+      
       final response = await http.post(
         Uri.parse('$baseUrl/manpowerReport'),
-        body: {
-          'api_token': apiToken,
-          'site_id': siteId.toString(),
-          'start_date': startDate,
-          'end_date': endDate,
-        },
+        body: body,
       );
       final data = _handleResponse(response, context);
 
@@ -1731,52 +1739,60 @@ class ApiService {
     });
   }
 
-  Future<Manpower> storeManPower({
+  Future<dynamic> storeManPower({
     required BuildContext context,
     required String apiToken,
     required int siteId,
     required String date,
-    required int skillWorker,
-    required int unskillWorker,
-    required int shift,
-    required double skillPayPerHead,
-    required double unskillPayPerHead,
-    required int contractor_id
+    required List<Map<String, dynamic>> data,
   }) async {
     return _handleNetworkCall(() async {
-      final url = '$baseUrl/storeManPower';
 
-      final body = {
-        'api_token': apiToken,
-        'site_id': siteId.toString(),
-        'date': date,
-        'skill_worker': skillWorker.toString(),
-        'unskill_worker': unskillWorker.toString(),
-        'shift': shift.toString(),
-        'skill_pay_per_head': skillPayPerHead.toString(),
-        'unskill_pay_per_head': unskillPayPerHead.toString(),
-        'contractor_id' : contractor_id.toString()
-      };
-
-      // Log request
-      _logApiRequest(
-        url: url,
-        method: 'POST',
-        body: body,
-      );
-      final response = await http.post(Uri.parse(url), body: body);
-
-      // Log response
-      _logApiResponse(response);
-
-
-      final data = _handleResponse(response, context);
 
       try {
-        return Manpower.fromJson(data['data']);
+        // Convert data to the format expected by the server
+        final List<Map<String, dynamic>> formattedData = data.map((entry) => {
+          'contractor_id': entry['contractor_id'],
+          'shift': entry['shift'],
+          'skilled_worker': entry['skill_worker'],
+          'unskilled_worker': entry['unskill_worker'],
+          'skill_pay_per_head': entry['skill_pay_per_head'],
+          'unskill_pay_per_head': entry['unskill_pay_per_head'],
+        }).toList();
+
+
+          log("FORMATED DATA == $formattedData");
+
+
+        final Map<String, dynamic> requestData = {
+          'api_token': apiToken,
+          'site_id': siteId.toString(),
+          'date': date,
+          'data': formattedData,
+        };
+
+        final response = await http
+            .post(
+          Uri.parse('$baseUrl/storeManPower'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: json.encode(requestData),
+        );
+
+
+
+        log("Save manpower response : ${response.body}");
+
+        // Use the proper response handler to check for errors
+        final Map<String, dynamic> jsonData = _handleResponse(response, context);
+        
+        // If we reach here, the response was successful
+        return jsonData;
       } catch (e) {
         log('Error parsing stored manpower data: $e');
-        log('Data received: ${data['data']}');
+
         throw ApiException('Invalid data format received from server',
             statusCode: 500);
       }

@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:nutanvij_electricals/models/manpower_entry_model.dart';
 import 'package:nutanvij_electricals/screens/site/providers/contractor_provider.dart';
 import 'package:nutanvij_electricals/widgets/add_contractor_sheet.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
-import '../../../core/utils/responsive.dart';
+
 import '../../../core/utils/snackbar_utils.dart';
 import '../../../services/api_service.dart';
 import '../../../providers/user_provider.dart';
@@ -39,7 +40,6 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
 
   // Add/Edit variables
   DateTime _selectedDate = DateTime.now();
-  Manpower? _currentManpower;
   bool _isLoadingManpower = false;
   bool _isEditing = false;
 
@@ -48,36 +48,25 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
   DateTime _endDate = DateTime.now();
   List<Manpower> _manpowerList = [];
   bool _isLoadingRange = false;
+  bool _isFilterExpanded = false;
 
   // Form controllers for adding/editing
-  final TextEditingController _skillWorkerController = TextEditingController();
-  final TextEditingController _unskillWorkerController =
-      TextEditingController();
-  final TextEditingController _skillPayController = TextEditingController();
-  final TextEditingController _unskillPayController = TextEditingController();
-  int _selectedShift = 1;
-
-  // Form validation
-  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final GlobalKey<FormState> _formKey2 = GlobalKey<FormState>();
 
-  int _selectedContractorId = -1;
   int _selectedContractorIdDateRange = -1;
 
   List<Manpower> _currentManpowerList = [];
-
-  int _selectedContractorId2 = -1;
   bool _isAddingMore = false;
   bool _isAddingMoreButton = false;
 
-
-  final TextEditingController _skillWorkerController2 = TextEditingController();
-  final TextEditingController _unskillWorkerController2 =
-  TextEditingController();
-  final TextEditingController _skillPayController2 = TextEditingController();
-  final TextEditingController _unskillPayController2 = TextEditingController();
-
-  int _selectedShift2 = 1;
+  // Multiple manpower entries support
+  List<Map<String, dynamic>> _manpowerEntries = [];
+  List<TextEditingController> _skillWorkerControllers = [];
+  List<TextEditingController> _unskillWorkerControllers = [];
+  List<TextEditingController> _skillPayControllers = [];
+  List<TextEditingController> _unskillPayControllers = [];
+  List<int> _selectedShifts = [];
+  List<int> _selectedContractorIds = [];
 
   @override
   void initState() {
@@ -102,10 +91,19 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
   @override
   void dispose() {
     _tabController.dispose();
-    _skillWorkerController.dispose();
-    _unskillWorkerController.dispose();
-    _skillPayController.dispose();
-    _unskillPayController.dispose();
+    // Dispose all controllers
+    for (var controller in _skillWorkerControllers) {
+      controller.dispose();
+    }
+    for (var controller in _unskillWorkerControllers) {
+      controller.dispose();
+    }
+    for (var controller in _skillPayControllers) {
+      controller.dispose();
+    }
+    for (var controller in _unskillPayControllers) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -117,7 +115,7 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
 
     try {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
-      final dateString = DateFormat('yyyy-MM-dd').format(_selectedDate);
+      final dateString = DateFormat('dd-MM-yyyy').format(_selectedDate);
 
       final manpower = await ApiService().getManPower(
         context: context,
@@ -131,17 +129,39 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
         _isLoadingManpower = false;
       });
 
-      // Pre-fill form if data exists
-      //TODO N
-/*      if (manpower?.id != null) {
-        _skillWorkerController.text = manpower!.skillWorker.toString();
-        _unskillWorkerController.text = manpower.unskillWorker.toString();
-        _skillPayController.text = manpower.skillPayPerHead.toString();
-        _unskillPayController.text = manpower.unskillPayPerHead.toString();
-        _selectedShift = manpower.shift;
-      } else {
+      // If data exists, automatically load it into editable form
+      if (manpower.isNotEmpty) {
+        setState(() {
+          _isEditing = true;
+          _isAddingMore = true;
+          _isAddingMoreButton = true;
+        });
+        
+        // Clear existing form and load all entries
         _clearForm();
-      }*/
+        
+        for (int i = 0; i < manpower.length; i++) {
+          final entry = manpower[i];
+          _addManpowerEntry();
+          
+          _skillWorkerControllers[i].text = entry.skillWorker.toString();
+          _unskillWorkerControllers[i].text = entry.unskillWorker.toString();
+          _skillPayControllers[i].text = entry.skillPayPerHead.toString();
+          _unskillPayControllers[i].text = entry.unskillPayPerHead.toString();
+          _selectedShifts[i] = entry.shift;
+          if (entry.contractor != null) {
+            _selectedContractorIds[i] = entry.contractor!.id;
+          }
+        }
+      } else {
+        // No data exists, show add form
+        setState(() {
+          _isEditing = false;
+          _isAddingMore = false;
+          _isAddingMoreButton = false;
+        });
+        _clearForm();
+      }
     } catch (e) {
       setState(() {
         _error = null; // Clear any previous errors
@@ -171,7 +191,7 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
 
     try {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
-      final dateString = DateFormat('yyyy-MM-dd').format(_selectedDate);
+      final dateString = DateFormat('dd-MM-yyyy').format(_selectedDate);
 
       final manpower = await ApiService().getManPowerWithContractor(
           context: context,
@@ -225,8 +245,8 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
 
     try {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
-      final startDateString = DateFormat('yyyy-MM-dd').format(_startDate);
-      final endDateString = DateFormat('yyyy-MM-dd').format(_endDate);
+      final startDateString = DateFormat('dd-MM-yyyy').format(_startDate);
+      final endDateString = DateFormat('dd-MM-yyyy').format(_endDate);
 
       final report = await ApiService().getManPowerReport(
         context: context,
@@ -234,6 +254,7 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
         siteId: widget.site.id,
         startDate: startDateString,
         endDate: endDateString,
+        contractorId: _selectedContractorIdDateRange != -1 ? _selectedContractorIdDateRange : null,
       );
 
       setState(() {
@@ -261,59 +282,82 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
   }
 
   void _clearForm() {
-    _skillWorkerController.clear();
-    _unskillWorkerController.clear();
-    _skillPayController.clear();
-    _unskillPayController.clear();
-    _selectedShift = 1;
+    // Clear all controllers
+    for (var controller in _skillWorkerControllers) {
+      controller.clear();
+    }
+    for (var controller in _unskillWorkerControllers) {
+      controller.clear();
+    }
+    for (var controller in _skillPayControllers) {
+      controller.clear();
+    }
+    for (var controller in _unskillPayControllers) {
+      controller.clear();
+    }
+    
+    // Reset lists
+    _manpowerEntries.clear();
+    _skillWorkerControllers.clear();
+    _unskillWorkerControllers.clear();
+    _skillPayControllers.clear();
+    _unskillPayControllers.clear();
+    _selectedShifts.clear();
+    _selectedContractorIds.clear();
+    
     _isEditing = false;
   }
 
-  Future<void> _saveManpower() async {
-    if (!_formKey.currentState!.validate()) return;
-
+  void _addManpowerEntry() {
     setState(() {
-      _isLoading = true;
-      _error = null;
+      _skillWorkerControllers.add(TextEditingController());
+      _unskillWorkerControllers.add(TextEditingController());
+      _skillPayControllers.add(TextEditingController());
+      _unskillPayControllers.add(TextEditingController());
+      _selectedShifts.add(1);
+      _selectedContractorIds.add(-1);
+      _manpowerEntries.add({});
     });
-
-    try {
-      final userProvider = Provider.of<UserProvider>(context, listen: false);
-      final dateString = DateFormat('yyyy-MM-dd').format(_selectedDate);
-
-      print("_selectedContractorId $_selectedContractorId");
-      final manpower = await ApiService().storeManPower(
-          context: context,
-          apiToken: userProvider.user?.data.apiToken ?? '',
-          siteId: widget.site.id,
-          date: dateString,
-          skillWorker: int.parse(_skillWorkerController.text),
-          unskillWorker: int.parse(_unskillWorkerController.text),
-          shift: _selectedShift,
-          skillPayPerHead: double.parse(_skillPayController.text),
-          unskillPayPerHead: double.parse(_unskillPayController.text),
-          contractor_id: _selectedContractorId);
-
-      setState(() {
-        _currentManpower = manpower;
-        _isLoading = false;
-        _isEditing = false;
-        _selectedContractorId = -1; // Reset editing state
-      });
-
-      SnackBarUtils.showSuccess(context, 'Manpower data saved successfully!');
-      _loadCurrentDateManpower();
-    } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
-      SnackBarUtils.showError(context, e.toString());
-    }
   }
 
-  Future<void> _saveManpower2() async {
+  void _removeManpowerEntry(int index) {
+    setState(() {
+      _skillWorkerControllers[index].dispose();
+      _unskillWorkerControllers[index].dispose();
+      _skillPayControllers[index].dispose();
+      _unskillPayControllers[index].dispose();
+      
+      _skillWorkerControllers.removeAt(index);
+      _unskillWorkerControllers.removeAt(index);
+      _skillPayControllers.removeAt(index);
+      _unskillPayControllers.removeAt(index);
+      _selectedShifts.removeAt(index);
+      _selectedContractorIds.removeAt(index);
+      _manpowerEntries.removeAt(index);
+    });
+  }
+
+
+  Future<void> _saveManpower() async {
     if (!_formKey2.currentState!.validate()) return;
+
+    // Validate that at least one entry has data
+    bool hasValidEntry = false;
+    for (int i = 0; i < _skillWorkerControllers.length; i++) {
+      if (_skillWorkerControllers[i].text.isNotEmpty && 
+          _unskillWorkerControllers[i].text.isNotEmpty &&
+          _skillPayControllers[i].text.isNotEmpty &&
+          _unskillPayControllers[i].text.isNotEmpty &&
+          _selectedContractorIds[i] != -1) {
+        hasValidEntry = true;
+        break;
+      }
+    }
+
+    if (!hasValidEntry) {
+      SnackBarUtils.showError(context, 'Please add at least one manpower entry');
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -322,31 +366,46 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
 
     try {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
-      final dateString = DateFormat('yyyy-MM-dd').format(_selectedDate);
+      final dateString = DateFormat('dd-MM-yyyy').format(_selectedDate);
 
-      print("_selectedContractorId $_selectedContractorId2");
-      final manpower = await ApiService().storeManPower(
-          context: context,
-          apiToken: userProvider.user?.data.apiToken ?? '',
-          siteId: widget.site.id,
-          date: dateString,
-          skillWorker: int.parse(_skillWorkerController2.text),
-          unskillWorker: int.parse(_unskillWorkerController2.text),
-          shift: _selectedShift2,
-          skillPayPerHead: double.parse(_skillPayController2.text),
-          unskillPayPerHead: double.parse(_unskillPayController2.text),
-          contractor_id: _selectedContractorId2);
+      // Prepare the data array with all valid entries
+      final List<ManpowerEntryModel> manpowerData = [];
+      
+      for (int i = 0; i < _skillWorkerControllers.length; i++) {
+        if (_skillWorkerControllers[i].text.isNotEmpty && 
+            _unskillWorkerControllers[i].text.isNotEmpty &&
+            _skillPayControllers[i].text.isNotEmpty &&
+            _unskillPayControllers[i].text.isNotEmpty &&
+            _selectedContractorIds[i] != -1) {
+          
+          manpowerData.add(ManpowerEntryModel(
+            shift: _selectedShifts[i],
+            skillWorker: int.parse(_skillWorkerControllers[i].text),
+            unskillWorker: int.parse(_unskillWorkerControllers[i].text),
+            contractorId: _selectedContractorIds[i],
+            skillPayPerHead: int.parse(_skillPayControllers[i].text),
+            unskillPayPerHead: int.parse(_unskillPayControllers[i].text),
+          ));
+        }
+      }
+
+      final List<Map<String, dynamic>> data = manpowerData.map((entry) => entry.toJson()).toList();
+
+
+
+      await ApiService().storeManPower(
+        context: context,
+        apiToken: userProvider.user?.data.apiToken ?? '',
+        siteId: widget.site.id,
+        date: dateString,
+        data: data,
+      );
 
       setState(() {
-        // _currentManpower = manpower;
         _isLoading = false;
+        _isAddingMore = false;
+        _isAddingMoreButton = false;
         _isEditing = false;
-        _selectedContractorId2 = -1; // Reset editing state
-
-        if(_currentManpowerList != null && _currentManpowerList.length > 0) {
-          _isAddingMore = false;
-          _isAddingMoreButton = false;
-        }
       });
 
       SnackBarUtils.showSuccess(context, 'Manpower data saved successfully!');
@@ -366,6 +425,28 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
       initialDate: isStartDate ? _startDate : _endDate,
       firstDate: DateTime(2020),
       lastDate: DateTime(2030),
+      builder: (context, child) {
+        return Container(
+          color: Colors.white,
+          child: Theme(
+            data: Theme.of(context).copyWith(
+              colorScheme: const ColorScheme.light(
+                surface: Colors.white,
+                onSurface: Colors.black,
+                primary: AppColors.primary,
+                onPrimary: Colors.white,
+              ),
+              dialogBackgroundColor: Colors.white,
+              scaffoldBackgroundColor: Colors.white,
+              cardColor: Colors.white,
+            ),
+            child: Material(
+              color: Colors.white,
+              child: child!,
+            ),
+          ),
+        );
+      },
     );
     if (picked != null) {
       setState(() {
@@ -393,7 +474,7 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
       backgroundColor: Colors.white,
       appBar: CustomAppBar(
         onMenuPressed: () => NavigationUtils.pop(context),
-        title: 'Manage Manpower - ${widget.site.name}',
+        title: 'Manage Manpower',
       ),
       body: GestureDetector(
         onTap: () {
@@ -463,155 +544,253 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Date Range Selector
-          Row(
-            children: [
-              Expanded(
-                child: InkWell(
-                  onTap: () => _selectDate(context, true),
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: AppColors.primary),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Start Date',
-                          style: AppTypography.bodySmall
-                              .copyWith(color: AppColors.primary),
-                        ),
-                        Text(
-                          DateFormat('dd MMM yyyy').format(_startDate),
-                          style: AppTypography.bodyMedium,
-                        ),
-                      ],
-                    ),
-                  ),
+          // Compact Filter Header
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey.shade200),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.shade100,
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
                 ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: InkWell(
-                  onTap: () => _selectDate(context, false),
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: AppColors.primary),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'End Date',
-                          style: AppTypography.bodySmall
-                              .copyWith(color: AppColors.primary),
-                        ),
-                        Text(
-                          DateFormat('dd MMM yyyy').format(_endDate),
-                          style: AppTypography.bodyMedium,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 16),
-          GestureDetector(
-            onTap: contractorProvider.isLoading
-                ? null
-                : () async {
-
-              final selectedId = await showModalBottomSheet<int>(
-                context: context,
-                isScrollControlled: true,
-                shape: const RoundedRectangleBorder(
-                  borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(16)),
-                ),
-                builder: (context) => ContractorBottomSheet(
-                  contractors: contractorProvider.contractors,
-                  selectedId: _selectedContractorIdDateRange,
-                  onAddContractor: () async {
-                    await showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      shape: const RoundedRectangleBorder(
-                        borderRadius: BorderRadius.vertical(
-                            top: Radius.circular(20)),
-                      ),
-                      backgroundColor: Colors.white,
-                      builder: (context) {
-                        return AddContractorSheet(
-                          onAdd: (name, email, phone) async {
-                            await _addContractor(
-                                name, email, phone);
-                          },
-                        );
-                      },
-                    );
+              ],
+            ),
+            child: Column(
+              children: [
+                // Header with summary and expand button
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      _isFilterExpanded = !_isFilterExpanded;
+                    });
                   },
-                ),
-              );
-
-              if (selectedId != null) {
-                setState(() {
-                  _selectedContractorIdDateRange = selectedId;
-                });
-
-                // 🔥 Call API again after selecting contractor
-                _loadCurrentDateManpowerContractor(
-                    _selectedContractorIdDateRange);
-              }
-            },
-            child: AbsorbPointer(
-              child: CustomTextField(
-                controller: TextEditingController(
-                  text: contractorProvider.contractors
-                      .firstWhere(
-                        (c) => c.id == _selectedContractorIdDateRange,
-                    orElse: () => Contractor(
-                      id: 0,
-                      name: '',
-                      mobile: '',
-                      email: '',
-                      siteId: 0,
-                      deletedAt: null,
-                      createdAt: '',
-                      updatedAt: '',
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.filter_list,
+                          color: AppColors.primary,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Report Filters',
+                                style: AppTypography.bodyMedium.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${DateFormat('dd MMM yyyy').format(_startDate)} - ${DateFormat('dd MMM yyyy').format(_endDate)}',
+                                style: AppTypography.bodySmall.copyWith(
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              if (_selectedContractorIdDateRange != -1)
+                                Text(
+                                  contractorProvider.contractors
+                                      .firstWhere(
+                                        (c) => c.id == _selectedContractorIdDateRange,
+                                        orElse: () => Contractor(
+                                          id: 0,
+                                          name: '',
+                                          mobile: '',
+                                          email: '',
+                                          siteId: 0,
+                                          deletedAt: null,
+                                          createdAt: '',
+                                          updatedAt: '',
+                                        ),
+                                      )
+                                      .name,
+                                  style: AppTypography.bodySmall.copyWith(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          _isFilterExpanded ? Icons.expand_less : Icons.expand_more,
+                          color: AppColors.primary,
+                        ),
+                      ],
                     ),
-                  )
-                      .name,
+                  ),
                 ),
-                label: 'Select Contractor',
-                readOnly: true,
-                suffixIcon: const Icon(
-                  Icons.arrow_drop_down,
-                  color: AppColors.primary, // set color here
-                ),
-              ),
+                
+                // Expandable Filter Content
+                if (_isFilterExpanded) ...[
+                  const Divider(height: 1),
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        // Date Range Selector
+                        Row(
+                          children: [
+                            Expanded(
+                              child: InkWell(
+                                onTap: () => _selectDate(context, true),
+                                child: Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: AppColors.primary),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Start Date',
+                                        style: AppTypography.bodySmall
+                                            .copyWith(color: AppColors.primary),
+                                      ),
+                                      Text(
+                                        DateFormat('dd MMM yyyy').format(_startDate),
+                                        style: AppTypography.bodyMedium,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: InkWell(
+                                onTap: () => _selectDate(context, false),
+                                child: Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: AppColors.primary),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'End Date',
+                                        style: AppTypography.bodySmall
+                                            .copyWith(color: AppColors.primary),
+                                      ),
+                                      Text(
+                                        DateFormat('dd MMM yyyy').format(_endDate),
+                                        style: AppTypography.bodyMedium,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 16),
+                        
+                        // Contractor Selection
+                        GestureDetector(
+                          onTap: contractorProvider.isLoading
+                              ? null
+                              : () async {
+                                  final selectedId = await showModalBottomSheet<int>(
+                                    context: context,
+                                    isScrollControlled: true,
+                                    shape: const RoundedRectangleBorder(
+                                      borderRadius:
+                                          BorderRadius.vertical(top: Radius.circular(16)),
+                                    ),
+                                    builder: (context) => ContractorBottomSheet(
+                                      contractors: contractorProvider.contractors,
+                                      selectedId: _selectedContractorIdDateRange,
+                                      onAddContractor: () async {
+                                        await showModalBottomSheet(
+                                          context: context,
+                                          isScrollControlled: true,
+                                          shape: const RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.vertical(
+                                                top: Radius.circular(20)),
+                                          ),
+                                          backgroundColor: Colors.white,
+                                          builder: (context) {
+                                            return AddContractorSheet(
+                                              onAdd: (name, email, phone) async {
+                                                await _addContractor(name, email, phone);
+                                              },
+                                            );
+                                          },
+                                        );
+                                      },
+                                    ),
+                                  );
+
+                                  if (selectedId != null) {
+                                    setState(() {
+                                      _selectedContractorIdDateRange = selectedId;
+                                    });
+
+                                    // 🔥 Call API again after selecting contractor
+                                    _loadCurrentDateManpowerContractor(
+                                        _selectedContractorIdDateRange);
+                                  }
+                                },
+                          child: AbsorbPointer(
+                            child: CustomTextField(
+                              controller: TextEditingController(
+                                text: contractorProvider.contractors
+                                    .firstWhere(
+                                      (c) => c.id == _selectedContractorIdDateRange,
+                                      orElse: () => Contractor(
+                                        id: 0,
+                                        name: 'All Contractors',
+                                        mobile: '',
+                                        email: '',
+                                        siteId: 0,
+                                        deletedAt: null,
+                                        createdAt: '',
+                                        updatedAt: '',
+                                      ),
+                                    )
+                                    .name,
+                              ),
+                              label: 'Select Contractor',
+                              readOnly: true,
+                              suffixIcon: const Icon(
+                                Icons.arrow_drop_down,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        // Load Report Button
+                        CustomButton(
+                          text: 'Load Report',
+                          onPressed: _loadManpowerRange,
+                          isLoading: _isLoadingRange,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-          const SizedBox(height: 16),
-
-          CustomButton(
-            text: 'Load Report',
-            onPressed: _loadManpowerRange,
-            isLoading: _isLoadingRange,
-          ),
-
-          const SizedBox(height: 24),
 
           // Report Summary
           if (_manpowerList.isNotEmpty) ...[
             _buildReportSummary(),
-            const SizedBox(height: 16),
+
           ],
 
           // Manpower List
@@ -651,7 +830,30 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
                       context: context,
                       initialDate: _selectedDate,
                       firstDate: DateTime(2020),
-                      lastDate: DateTime.now(),                    );
+                      lastDate: DateTime.now(),
+                      builder: (context, child) {
+                        return Container(
+                          color: Colors.white,
+                          child: Theme(
+                            data: Theme.of(context).copyWith(
+                              colorScheme: const ColorScheme.light(
+                                surface: Colors.white,
+                                onSurface: Colors.black,
+                                primary: AppColors.primary,
+                                onPrimary: Colors.white,
+                              ),
+                              dialogBackgroundColor: Colors.white,
+                              scaffoldBackgroundColor: Colors.white,
+                              cardColor: Colors.white,
+                            ),
+                            child: Material(
+                              color: Colors.white,
+                              child: child!,
+                            ),
+                          ),
+                        );
+                      },
+                    );
                     if (picked != null) {
                       setState(() {
                         _selectedDate = picked;
@@ -690,7 +892,19 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
           // Current Data Display (only show if data exists and not loading)
           if (_isLoadingManpower)
             const Center(child: CircularProgressIndicator())
-          else if (_currentManpowerList != null && _currentManpowerList.length > 0 && !_isEditing) ...[
+          else if (_currentManpowerList.isNotEmpty &&
+              !_isEditing &&
+              !_isAddingMore) ...[
+            // Show existing manpower entries for the selected date
+            Text(
+              'Manpower for ${DateFormat('dd MMM yyyy').format(_selectedDate)}',
+              style: AppTypography.titleMedium.copyWith(
+                fontWeight: FontWeight.bold,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(height: 16),
+
             ListView.builder(
               itemCount: _currentManpowerList.length,
               shrinkWrap: true,
@@ -700,497 +914,163 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
               },
             ),
 
-            // _buildManpowerCard(_currentManpower!),
             const SizedBox(height: 24),
+
+            // Add More Button
+            CustomButton(
+              text: 'Add More Entries',
+              onPressed: () {
+                setState(() {
+                  _isAddingMore = true;
+                  _isAddingMoreButton = true;
+                });
+              },
+              backgroundColor: AppColors.primary,
+            ),
+          ] else if (_currentManpowerList.isEmpty &&
+              !_isEditing &&
+              !_isAddingMore) ...[
+            // No data found for the selected date
+            Center(
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.people_outline,
+                    size: 64,
+                    color: Colors.grey[400],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No manpower data found for ${DateFormat('dd MMM yyyy').format(_selectedDate)}',
+                    style: AppTypography.titleMedium
+                        .copyWith(color: Colors.grey[600]),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Add the first manpower entry for this date',
+                    style: AppTypography.bodyMedium
+                        .copyWith(color: Colors.grey[500]),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  CustomButton(
+                    text: 'Add Manpower',
+                    onPressed: () {
+                      setState(() {
+                        _isAddingMore = true;
+                        _isAddingMoreButton = true;
+                        _clearForm();
+                      });
+                    },
+                    backgroundColor: AppColors.primary,
+                  ),
+                ],
+              ),
+            ),
           ],
 
-          // Form (only show when editing or adding new data)
-          if (_isEditing || _currentManpowerList.length == 0)
-            Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Contractor Dropdown
-                  GestureDetector(
-                    onTap: contractorProvider.isLoading
-                        ? null
-                        : () async {
-                            final selectedId = await showModalBottomSheet<int>(
-                              context: context,
-                              isScrollControlled: true,
-                              shape: const RoundedRectangleBorder(
-                                borderRadius: BorderRadius.vertical(
-                                    top: Radius.circular(16)),
-                              ),
-                              builder: (context) => ContractorBottomSheet(
-                                contractors: contractorProvider.contractors,
-                                selectedId: _selectedContractorId,
-                                onAddContractor: () async {
-                                  await showModalBottomSheet(
-                                    context: context,
-                                    isScrollControlled: true,
-                                    shape: const RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.vertical(
-                                          top: Radius.circular(20)),
-                                    ),
-                                    backgroundColor: Colors.white,
-                                    builder: (context) {
-                                      return AddContractorSheet(
-                                        onAdd: (name, email, phone) async {
-                                          await _addContractor(
-                                              name, email, phone);
-                                        },
-                                      );
-                                    },
-                                  );
+          // Form (only show when adding new data)
+          if (_isAddingMore && _isAddingMoreButton)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      _isEditing ? 'Edit Manpower Entries' : 'Add Manpower',
+                      style: AppTypography.titleMedium.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    SizedBox(
+                      height: 32,
+                      child: ElevatedButton(
+                        onPressed: _addManpowerEntry,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                        child: Text(
+                          'Add Entry',
+                          style: AppTypography.bodySmall.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                
+                Form(
+                  key: _formKey2,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        // Initialize first entry if empty
+                        if (_skillWorkerControllers.isEmpty)
+                          Builder(
+                            builder: (context) {
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                _addManpowerEntry();
+                              });
+                              return const SizedBox.shrink();
+                            },
+                          ),
+                        
+                        // Multiple manpower entries in a compact list
+                        ListView.builder(
+                          padding: EdgeInsets.zero,
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _skillWorkerControllers.length,
+                          itemBuilder: (context, index) {
+                            return _buildManpowerEntryCard(index, contractorProvider);
+                          },
+                        ),
+                        
+                        const SizedBox(height: 32),
+
+                        // Action Buttons
+                        Row(
+                          children: [
+                            Expanded(
+                              child: CustomButton(
+                                text: 'Cancel',
+                                onPressed: () {
+                                  setState(() {
+                                    _isAddingMore = false;
+                                    _isAddingMoreButton = false;
+                                  });
+                                  _clearForm();
                                 },
+                                backgroundColor: Colors.grey,
                               ),
-                            );
-
-                            if (selectedId != null) {
-                              setState(() {
-                                _selectedContractorId = selectedId;
-                              });
-
-                              // 🔥 Call API again after selecting contractor
-                              _loadCurrentDateManpowerContractor(
-                                  _selectedContractorId);
-                            }
-                          },
-                    child: AbsorbPointer(
-                      child: CustomTextField(
-                        controller: TextEditingController(
-                          text: contractorProvider.contractors
-                              .firstWhere(
-                                (c) => c.id == _selectedContractorId,
-                                orElse: () => Contractor(
-                                  id: 0,
-                                  name: '',
-                                  mobile: '',
-                                  email: '',
-                                  siteId: 0,
-                                  deletedAt: null,
-                                  createdAt: '',
-                                  updatedAt: '',
-                                ),
-                              )
-                              .name,
-                        ),
-                        label: 'Select Contractor',
-                        readOnly: true,
-                        suffixIcon: const Icon(
-                          Icons.arrow_drop_down,
-                          color: AppColors.primary, // set color here
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Skilled Worker Field
-                  CustomTextField(
-                    controller: _skillWorkerController,
-                    label: 'Skilled Workers (Enter number of skilled workers)',
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter number of skilled workers';
-                      }
-                      if (int.tryParse(value) == null) {
-                        return 'Please enter a valid number';
-                      }
-                      if (int.parse(value) < 0) {
-                        return 'Number cannot be negative';
-                      }
-                      return null;
-                    },
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  CustomTextField(
-                    controller: _unskillWorkerController,
-                    label:
-                        'Unskilled Workers (Enter number of unskilled workers)',
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter number of unskilled workers';
-                      }
-                      if (int.tryParse(value) == null) {
-                        return 'Please enter a valid number';
-                      }
-                      if (int.parse(value) < 0) {
-                        return 'Number cannot be negative';
-                      }
-                      return null;
-                    },
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  CustomTextField(
-                    controller: _skillPayController,
-                    label:
-                        'Skilled Worker Pay (₹/head) (Enter pay per skilled worker)',
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter pay per skilled worker';
-                      }
-                      if (double.tryParse(value) == null) {
-                        return 'Please enter a valid amount';
-                      }
-                      if (double.parse(value) < 0) {
-                        return 'Amount cannot be negative';
-                      }
-                      return null;
-                    },
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  CustomTextField(
-                    controller: _unskillPayController,
-                    label:
-                        'Unskilled Worker Pay (₹/head) (Enter pay per unskilled worker)',
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter pay per unskilled worker';
-                      }
-                      if (double.tryParse(value) == null) {
-                        return 'Please enter a valid amount';
-                      }
-                      if (double.parse(value) < 0) {
-                        return 'Amount cannot be negative';
-                      }
-                      return null;
-                    },
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Shift Selection
-                  Text(
-                    'Shift',
-                    style: AppTypography.bodyMedium
-                        .copyWith(fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(color: AppColors.primary),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: DropdownButtonFormField<int>(
-                      value: _selectedShift,
-                      decoration: const InputDecoration(
-                        border: InputBorder.none,
-                        contentPadding:
-                            EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 1, child: Text('Day')),
-                        DropdownMenuItem(value: 2, child: Text('Night')),
-                        DropdownMenuItem(value: 3, child: Text('Day & Night')),
-                      ],
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedShift = value!;
-                        });
-                      },
-                    ),
-                  ),
-
-                  const SizedBox(height: 32),
-
-                  // Action Buttons
-                  Row(
-                    children: [
-                      if (_isEditing) ...[
-                        Expanded(
-                          child: CustomButton(
-                            text: 'Cancel',
-                            onPressed: () {
-                              setState(() {
-                                _isEditing = false;
-                              });
-                              _clearForm();
-                            },
-                            backgroundColor: Colors.grey,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                      ],
-                      Expanded(
-                        child: CustomButton(
-                          text: _currentManpower != null
-                              ? 'Update Manpower'
-                              : 'Save Manpower',
-                          onPressed: _saveManpower,
-                          isLoading: _isLoading,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-          if(_isAddingMore && _isAddingMoreButton)
-            Form(
-              key: _formKey2,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Contractor Dropdown
-                  GestureDetector(
-                    onTap: contractorProvider.isLoading
-                        ? null
-                        : () async {
-
-
-                      final usedContractorIds = _currentManpowerList.map((m) => m.contractor?.id).whereType<int>().toSet();
-                      final availableContractors = contractorProvider.contractorsFiltered
-                          .where((c) => !usedContractorIds.contains(c.id))
-                          .toList();
-
-                      final selectedId = await showModalBottomSheet<int>(
-                        context: context,
-                        isScrollControlled: true,
-                        shape: const RoundedRectangleBorder(
-                          borderRadius: BorderRadius.vertical(
-                              top: Radius.circular(16)),
-                        ),
-                        builder: (context) => ContractorBottomSheet(
-                          contractors: availableContractors,
-                          selectedId: _selectedContractorId2,
-                          onAddContractor: () async {
-                            await showModalBottomSheet(
-                              context: context,
-                              isScrollControlled: true,
-                              shape: const RoundedRectangleBorder(
-                                borderRadius: BorderRadius.vertical(
-                                    top: Radius.circular(20)),
-                              ),
-                              backgroundColor: Colors.white,
-                              builder: (context) {
-                                return AddContractorSheet(
-                                  onAdd: (name, email, phone) async {
-                                    await _addContractor(
-                                        name, email, phone);
-                                  },
-                                );
-                              },
-                            );
-                          },
-                        ),
-                      );
-
-                      if (selectedId != null) {
-                        setState(() {
-                          _selectedContractorId2 = selectedId;
-                        });
-
-
-                      }
-                    },
-                    child: AbsorbPointer(
-                      child: CustomTextField(
-                        controller: TextEditingController(
-                          text: contractorProvider.contractorsFiltered
-                              .firstWhere(
-                                (c) => c.id == _selectedContractorId2,
-                            orElse: () => Contractor(
-                              id: 0,
-                              name: '',
-                              mobile: '',
-                              email: '',
-                              siteId: 0,
-                              deletedAt: null,
-                              createdAt: '',
-                              updatedAt: '',
                             ),
-                          )
-                              .name,
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: CustomButton(
+                                text: _isEditing ? 'Update Manpower' : 'Save All Entries',
+                                onPressed: _saveManpower,
+                                isLoading: _isLoading,
+                              ),
+                            ),
+                          ],
                         ),
-                        label: 'Select Contractor',
-                        readOnly: true,
-                        suffixIcon: const Icon(
-                          Icons.arrow_drop_down,
-                          color: AppColors.primary, // set color here
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Skilled Worker Field
-                  CustomTextField(
-                    controller: _skillWorkerController2,
-                    label: 'Skilled Workers (Enter number of skilled workers)',
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter number of skilled workers';
-                      }
-                      if (int.tryParse(value) == null) {
-                        return 'Please enter a valid number';
-                      }
-                      if (int.parse(value) < 0) {
-                        return 'Number cannot be negative';
-                      }
-                      return null;
-                    },
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  CustomTextField(
-                    controller: _unskillWorkerController2,
-                    label:
-                    'Unskilled Workers (Enter number of unskilled workers)',
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter number of unskilled workers';
-                      }
-                      if (int.tryParse(value) == null) {
-                        return 'Please enter a valid number';
-                      }
-                      if (int.parse(value) < 0) {
-                        return 'Number cannot be negative';
-                      }
-                      return null;
-                    },
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  CustomTextField(
-                    controller: _skillPayController2,
-                    label:
-                    'Skilled Worker Pay (₹/head) (Enter pay per skilled worker)',
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter pay per skilled worker';
-                      }
-                      if (double.tryParse(value) == null) {
-                        return 'Please enter a valid amount';
-                      }
-                      if (double.parse(value) < 0) {
-                        return 'Amount cannot be negative';
-                      }
-                      return null;
-                    },
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  CustomTextField(
-                    controller: _unskillPayController2,
-                    label:
-                    'Unskilled Worker Pay (₹/head) (Enter pay per unskilled worker)',
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter pay per unskilled worker';
-                      }
-                      if (double.tryParse(value) == null) {
-                        return 'Please enter a valid amount';
-                      }
-                      if (double.parse(value) < 0) {
-                        return 'Amount cannot be negative';
-                      }
-                      return null;
-                    },
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Shift Selection
-                  Text(
-                    'Shift',
-                    style: AppTypography.bodyMedium
-                        .copyWith(fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(color: AppColors.primary),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: DropdownButtonFormField<int>(
-                      value: _selectedShift2,
-                      decoration: const InputDecoration(
-                        border: InputBorder.none,
-                        contentPadding:
-                        EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 1, child: Text('Day')),
-                        DropdownMenuItem(value: 2, child: Text('Night')),
-                        DropdownMenuItem(value: 3, child: Text('Day & Night')),
                       ],
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedShift2 = value!;
-                        });
-                      },
                     ),
                   ),
-
-                  const SizedBox(height: 32),
-
-                  // Action Buttons
-                  Row(
-                    children: [
-                      if (_isEditing) ...[
-                        Expanded(
-                          child: CustomButton(
-                            text: 'Cancel',
-                            onPressed: () {
-                              setState(() {
-                                _isEditing = false;
-                              });
-                              _clearForm();
-                            },
-                            backgroundColor: Colors.grey,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                      ],
-                      Expanded(
-                        child: CustomButton(
-                          text: 'Save Manpower',
-                          onPressed: _saveManpower2,
-                          isLoading: _isLoading,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-          if (_currentManpowerList != null && _currentManpowerList.length > 0 && !_isEditing)
-            Visibility(
-              visible: _isAddingMoreButton ? false : true,
-              child: CustomButton(
-                text: 'Add More',
-                onPressed: () {
-                  setState(() {
-                    _isEditing = true;
-                    _isAddingMore = true;
-                    _isAddingMoreButton = true;
-                    _clearForm(); // reset form for new entry
-                  });
-                },
-                backgroundColor: AppColors.primary.withOpacity(0.8),
-              ),
+                ),
+              ],
             ),
 
           const SizedBox(height: 16),
@@ -1201,6 +1081,7 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
 
   Widget _buildManpowerCard(Manpower manpower) {
     return Card(
+      color: Colors.white,
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -1222,7 +1103,7 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
+                        color: AppColors.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -1230,39 +1111,6 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
                         style: AppTypography.bodySmall.copyWith(
                           color: AppColors.primary,
                           fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    InkWell(
-                      onTap: () {
-                        setState(() {
-                          _isEditing = true;
-                        });
-                        // Pre-fill form with current data
-                        _skillWorkerController.text =
-                            manpower.skillWorker.toString();
-                        _unskillWorkerController.text =
-                            manpower.unskillWorker.toString();
-                        _skillPayController.text =
-                            manpower.skillPayPerHead.toString();
-                        _unskillPayController.text =
-                            manpower.unskillPayPerHead.toString();
-                        _selectedShift = manpower.shift;
-                        if (manpower.contractor != null) {
-                          _selectedContractorId = manpower.contractor!.id;
-                        }
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          Icons.edit,
-                          size: 20,
-                          color: AppColors.primary,
                         ),
                       ),
                     ),
@@ -1277,7 +1125,7 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
             if (manpower.contractor != null) ...[
               Row(
                 children: [
-                  Icon(Icons.business, color: AppColors.primary, size: 20),
+                  const Icon(Icons.business, color: AppColors.primary, size: 20),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
@@ -1431,6 +1279,7 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
         _manpowerList.fold<double>(0, (sum, item) => sum + item.totalAmount);
 
     return Card(
+      color: Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -1482,10 +1331,349 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
     );
   }
 
+  Widget _buildManpowerEntryCard(int index, ContractorProvider contractorProvider) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      color: Colors.white,
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+
+
+
+            // Contractor Selection
+            Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: contractorProvider.isLoading
+                        ? null
+                        : () async {
+                            final usedContractorIds = _currentManpowerList
+                                .map((m) => m.contractor?.id)
+                                .whereType<int>()
+                                .toSet();
+                            for (int i = 0; i < _selectedContractorIds.length; i++) {
+                              if (i != index && _selectedContractorIds[i] != -1) {
+                                usedContractorIds.add(_selectedContractorIds[i]);
+                              }
+                            }
+
+                            final availableContractors = contractorProvider.contractorsFiltered
+                                .where((c) => !usedContractorIds.contains(c.id))
+                                .toList();
+
+                            final selectedId = await showModalBottomSheet<int>(
+                              context: context,
+                              isScrollControlled: true,
+                              shape: const RoundedRectangleBorder(
+                                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                              ),
+                              builder: (context) => ContractorBottomSheet(
+                                contractors: availableContractors,
+                                selectedId: _selectedContractorIds[index],
+                                onAddContractor: () async {
+                                  await showModalBottomSheet(
+                                    context: context,
+                                    isScrollControlled: true,
+                                    shape: const RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                                    ),
+                                    backgroundColor: Colors.white,
+                                    builder: (context) {
+                                      return AddContractorSheet(
+                                        onAdd: (name, email, phone) async {
+                                          await _addContractor(name, email, phone);
+                                        },
+                                      );
+                                    },
+                                  );
+                                },
+                              ),
+                            );
+
+                            if (selectedId != null) {
+                              setState(() {
+                                _selectedContractorIds[index] = selectedId;
+                              });
+                            }
+                          },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.business, color: AppColors.primary, size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              contractorProvider.contractorsFiltered
+                                  .firstWhere(
+                                    (c) => c.id == _selectedContractorIds[index],
+                                    orElse: () => Contractor(
+                                      id: 0,
+                                      name: 'Select Contractor',
+                                      mobile: '',
+                                      email: '',
+                                      siteId: 0,
+                                      deletedAt: null,
+                                      createdAt: '',
+                                      updatedAt: '',
+                                    ),
+                                  )
+                                  .name,
+                              style: AppTypography.bodyMedium.copyWith(fontSize: 14),
+                            ),
+                          ),
+                          const Icon(Icons.arrow_drop_down, color: AppColors.primary, size: 16),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => _removeManpowerEntry(index),
+                  icon: const Icon(Icons.delete, color: Colors.red, size: 18),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Form fields - Single row for workers
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 50,
+                    child: TextFormField(
+                      controller: _skillWorkerControllers[index],
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'Skilled',
+                        labelStyle: AppTypography.bodyMedium.copyWith(fontSize: 13),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.3)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.3)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: AppColors.primary),
+                        ),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Required';
+                        }
+                        if (int.tryParse(value) == null) {
+                          return 'Invalid';
+                        }
+                        if (int.parse(value) < 0) {
+                          return 'Invalid';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: SizedBox(
+                    height: 50,
+                    child: TextFormField(
+                      controller: _unskillWorkerControllers[index],
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'Unskilled',
+                        labelStyle: AppTypography.bodyMedium.copyWith(fontSize: 13),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.3)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.3)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: AppColors.primary),
+                        ),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Required';
+                        }
+                        if (int.tryParse(value) == null) {
+                          return 'Invalid';
+                        }
+                        if (int.parse(value) < 0) {
+                          return 'Invalid';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            // Form fields - Single row for pay
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 50,
+                    child: TextFormField(
+                      controller: _skillPayControllers[index],
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'Skilled Pay (₹)',
+                        labelStyle: AppTypography.bodyMedium.copyWith(fontSize: 13),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.3)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.3)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: AppColors.primary),
+                        ),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Required';
+                        }
+                        if (int.tryParse(value) == null) {
+                          return 'Invalid';
+                        }
+                        if (int.parse(value) < 0) {
+                          return 'Invalid';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: SizedBox(
+                    height: 50,
+                    child: TextFormField(
+                      controller: _unskillPayControllers[index],
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'Unskilled Pay (₹)',
+                        labelStyle: AppTypography.bodyMedium.copyWith(fontSize: 13),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.3)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.3)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: AppColors.primary),
+                        ),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Required';
+                        }
+                        if (int.tryParse(value) == null) {
+                          return 'Invalid';
+                        }
+                        if (int.parse(value) < 0) {
+                          return 'Invalid';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            // Shift Selection
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.access_time, color: AppColors.primary, size: 16),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Shift:',
+                    style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.w600, fontSize: 14),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: DropdownButton<int>(
+                      value: _selectedShifts[index],
+                      underline: const SizedBox(),
+                      icon: const Icon(Icons.arrow_drop_down, size: 18),
+                      items: const [
+                        DropdownMenuItem(value: 1, child: Text('Day', style: TextStyle(fontSize: 14))),
+                        DropdownMenuItem(value: 2, child: Text('Night', style: TextStyle(fontSize: 14))),
+                        DropdownMenuItem(value: 3, child: Text('Day & Night', style: TextStyle(fontSize: 14))),
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedShifts[index] = value!;
+                        });
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _addContractor(String name, String email, String phone) async {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     final contractorProvider =
-    Provider.of<ContractorProvider>(context, listen: false);
+        Provider.of<ContractorProvider>(context, listen: false);
 
     await contractorProvider.addNewContractor(
       context: context,
@@ -1495,6 +1683,5 @@ class _ManpowerManagementScreenState extends State<ManpowerManagementScreen>
       mobile: phone,
       email: email,
     );
-
   }
 }

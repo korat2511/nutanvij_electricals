@@ -29,11 +29,13 @@ class _ContractorBottomSheetState extends State<ContractorBottomSheet> {
         .where((c) => c.name.toLowerCase().contains(_search.toLowerCase()))
         .toList();
 
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: Column(
+    return Container(
+      color: Colors.white,
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           // Header
@@ -107,6 +109,7 @@ class _ContractorBottomSheetState extends State<ContractorBottomSheet> {
           ),
           const SizedBox(height: 12),
         ],
+      ),
       ),
     );
   }

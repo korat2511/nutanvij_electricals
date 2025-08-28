@@ -32,14 +32,16 @@ class _AddContractorSheetState extends State<AddContractorSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-      ),
-      child: Form(
+    return Container(
+      color: Colors.white,
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        ),
+        child: Form(
         key: _formKey,
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -138,6 +140,7 @@ class _AddContractorSheetState extends State<AddContractorSheet> {
               ),
             ),
           ],
+        ),
         ),
       ),
     );

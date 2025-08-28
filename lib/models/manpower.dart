@@ -7,8 +7,8 @@ class Manpower {
   final int skillWorker;
   final int unskillWorker;
   final int shift;
-  final double skillPayPerHead;
-  final double unskillPayPerHead;
+  final int skillPayPerHead;
+  final int unskillPayPerHead;
   final double totalAmount;
   final String? createdAt;
   final String? updatedAt;
@@ -34,11 +34,11 @@ class Manpower {
       id: _parseInt(json['id']),
       siteId: _parseInt(json['site_id']) ?? 0,
       date: json['date']?.toString() ?? '',
-      skillWorker: _parseInt(json['skill_worker']) ?? 0,
-      unskillWorker: _parseInt(json['unskill_worker']) ?? 0,
+      skillWorker: _parseInt(json['skilled_worker']) ?? 0,
+      unskillWorker: _parseInt(json['unskilled_worker']) ?? 0,
       shift: _parseInt(json['shift']) ?? 1,
-      skillPayPerHead: _parseDouble(json['skill_pay_per_head']) ?? 0.0,
-      unskillPayPerHead: _parseDouble(json['unskill_pay_per_head']) ?? 0.0,
+      skillPayPerHead: _parseIntFromString(json['skill_pay_per_head']) ?? 0,
+      unskillPayPerHead: _parseIntFromString(json['unskill_pay_per_head']) ?? 0,
       totalAmount: _parseDouble(json['total_amount']) ?? 0.0,
       createdAt: json['created_at']?.toString(),
       updatedAt: json['updated_at']?.toString(),
@@ -69,6 +69,17 @@ class Manpower {
     return null;
   }
 
+  static int? _parseIntFromString(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is String) {
+      // Handle string values like "250.00" or "0.00"
+      final cleanValue = value.replaceAll('.00', '');
+      return int.tryParse(cleanValue);
+    }
+    return null;
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -94,8 +105,8 @@ class Manpower {
     int? skillWorker,
     int? unskillWorker,
     int? shift,
-    double? skillPayPerHead,
-    double? unskillPayPerHead,
+    int? skillPayPerHead,
+    int? unskillPayPerHead,
     double? totalAmount,
     String? createdAt,
     String? updatedAt,

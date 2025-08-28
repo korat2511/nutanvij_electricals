@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:nutanvij_electricals/core/utils/navigation_utils.dart';
 import 'package:nutanvij_electricals/core/utils/task_validation_utils.dart';
 import 'package:nutanvij_electricals/core/utils/snackbar_utils.dart';
