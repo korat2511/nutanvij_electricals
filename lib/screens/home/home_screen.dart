@@ -2,6 +2,7 @@ import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:nutanvij_electricals/screens/home/providers/location_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:app_settings/app_settings.dart';
 import '../../core/theme/app_colors.dart';
@@ -412,19 +413,42 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Check if auto checkout monitoring should be active based on current attendance status
     _checkAutoCheckoutStatus();
-    
+
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final userId = userProvider.user?.data.id.toString();
+
+    //location tracking
+    if (userId != null) {
+      final locationProvider =
+      Provider.of<LocationProvider>(context, listen: false);
+
+      // Start tracking when screen opens
+      locationProvider.startTracking(userId, context);
+
+
+    }
+
     // Check for auto checkout validation when app starts (with delay to ensure data is loaded)
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) {
         _checkAutoCheckoutOnAppStart();
       }
     });
+
   }
+
+
+
 
   @override
   void dispose() {
     // Stop auto checkout monitoring when leaving the screen
     AutoCheckoutService.instance.stopMonitoring();
+
+    //TODO
+    //stop tracking
+    // Provider.of<LocationProvider>(context, listen: false).stopTracking();
+
     super.dispose();
   }
 

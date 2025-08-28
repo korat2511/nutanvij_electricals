@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:nutanvij_electricals/screens/home/home_screen.dart';
+import 'package:nutanvij_electricals/screens/home/providers/location_provider.dart';
 import 'package:nutanvij_electricals/screens/inventory/providers/create_transporter_provider.dart';
 import 'package:nutanvij_electricals/screens/inventory/providers/download_report_provider.dart';
 import 'package:nutanvij_electricals/screens/inventory/providers/edit_transporter_provider.dart';
@@ -12,6 +13,7 @@ import 'package:nutanvij_electricals/screens/splash_screen.dart';
 import 'package:nutanvij_electricals/screens/task/task_list_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'core/utils/location_service/location_service.dart';
 import 'core/utils/navigation_utils.dart';
 import 'firebase_options.dart';
 import 'providers/user_provider.dart';
@@ -44,6 +46,7 @@ void main() async{
     print('App opened from terminated state: ${initialMessage.data}');
     _handleNotificationNavigation(initialMessage);
   }
+  await LocationService.initializeService();
 
   runApp(const MyApp());
 }
@@ -146,6 +149,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         ChangeNotifierProvider(create: (_) => TransporterFairProvider()),
         ChangeNotifierProvider(create: (_) => DownloadReportProvider()),
         ChangeNotifierProvider(create: (_) => ContractorProvider()),
+        ChangeNotifierProvider(create: (_) => LocationProvider()),
 
 
       ],

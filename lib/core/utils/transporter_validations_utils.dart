@@ -7,7 +7,10 @@ class TansporterValidationUtils {
 
   static bool canCreateTransporter(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
-    return userProvider.user?.data.designationId == 1 || userProvider.user?.data.designationId == 2;
+    return userProvider.user?.data.designationId == 1 ||
+        userProvider.user?.data.designationId == 2 ||
+        userProvider.user?.data.designationId == 3 ||
+        userProvider.user?.data.designationId == 4;
   }
 
   /// ✅ Email Validation

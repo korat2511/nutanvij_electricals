@@ -38,6 +38,11 @@ dependencies:
   open_file: ^3.3.2
   url_launcher: ^6.3.2
   month_picker_dialog: ^6.5.0
+  flutter_background_service: ^5.1.0
+  fluttertoast: ^8.2.8   # ✅ latest stable version (as of Aug 2025)
+
+#  background_locator_2: ^2.0.6
+
 #  timeline_tile: ^2.0.0
 #  rename_app: ^1.6.3
 

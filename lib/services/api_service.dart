@@ -142,7 +142,7 @@ class ApiService {
     } catch (e) {
       if (e is ApiException) rethrow;
       log("E == $e");
-      
+
       // Provide more specific error messages
       if (e.toString().contains('PathNotFoundException')) {
         throw ApiException(
@@ -315,7 +315,7 @@ class ApiService {
       }
 
       var request = http.MultipartRequest('POST', Uri.parse('$baseUrl/signUp'));
-      
+
       // Add text fields
       request.fields.addAll({
         'name': name,
@@ -970,11 +970,11 @@ class ApiService {
       request.fields['end_date'] = endDate;
       request.fields['min_range'] = minRange.toString();
       request.fields['max_range'] = maxRange.toString();
-      
+
       for (var img in newImagePaths) {
         request.files.add(await http.MultipartFile.fromPath('images[]', img));
       }
-      
+
       var streamedResponse = await request.send();
       var response = await http.Response.fromStream(streamedResponse);
 
@@ -1445,7 +1445,7 @@ class ApiService {
     return _handleNetworkCall(() async {
       var request =
           http.MultipartRequest('POST', Uri.parse('$baseUrl/editProgress'));
-      
+
       request.fields['api_token'] = apiToken;
       request.fields['task_progress_id'] = progressId.toString();
       request.fields['work_done'] = workDone;
@@ -1708,12 +1708,12 @@ class ApiService {
         'start_date': startDate,
         'end_date': endDate,
       };
-      
+
       // Add contractor_id if provided
       if (contractorId != null && contractorId != -1) {
         body['contractor_id'] = contractorId.toString();
       }
-      
+
       final response = await http.post(
         Uri.parse('$baseUrl/manpowerReport'),
         body: body,
@@ -1787,7 +1787,7 @@ class ApiService {
 
         // Use the proper response handler to check for errors
         final Map<String, dynamic> jsonData = _handleResponse(response, context);
-        
+
         // If we reach here, the response was successful
         return jsonData;
       } catch (e) {
