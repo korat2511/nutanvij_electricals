@@ -17,6 +17,7 @@ import '../../core/constants/user_access.dart';
 
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/custom_button.dart';
+import 'all_user_route_screen.dart';
 import 'apply_leave_screen.dart';
 import 'edit_attendance_request_list_screen.dart';
 import 'holiday_calendar_screen.dart';
@@ -418,6 +419,17 @@ class _AttendanceSummaryScreenState extends State<AttendanceSummaryScreen>
                                   NavigationUtils.push(
                                       context,
                                       const ExpenseRequestListScreen(isAllUsers: true));
+                                },
+                              ),
+                              ListTile(
+                                leading: const Icon(Icons.route,
+                                    color: AppColors.primary),
+                                title: const Text('View User Routes'),
+                                onTap: () {
+                                  NavigationUtils.pop(ctx);
+                                  NavigationUtils.push(
+                                      context,
+                                      const AllUserRouteScreen());
                                 },
                               ),
 
