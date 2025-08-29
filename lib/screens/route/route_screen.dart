@@ -63,6 +63,16 @@ class _RouteScreenState extends State<RouteScreen> {
           .orderBy('timestamp', descending: true)
           .get();
 
+      //TODO
+/*
+      final snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .collection('location_track_history')
+          .orderBy('time', descending: true)
+          .get();
+*/
+
       final locations = snapshot.docs.map((doc) {
         final data = doc.data();
         return {
