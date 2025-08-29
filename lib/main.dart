@@ -46,8 +46,7 @@ void main() async{
     print('App opened from terminated state: ${initialMessage.data}');
     _handleNotificationNavigation(initialMessage);
   }
-  //TODO
-  // await LocationService.initializeService();
+  await LocationService.initializeService();
 
   runApp(const MyApp());
 }
