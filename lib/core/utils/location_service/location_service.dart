@@ -96,9 +96,9 @@ void onStart(ServiceInstance service) {
       "latitude": pos.latitude,
       "longitude": pos.longitude,
       "status" : "active",
-      "timestamp" : DateTime.now().millisecondsSinceEpoch
-      // "address": address,
-      // "note": note,
+      "timestamp" : DateTime.now().millisecondsSinceEpoch,
+      "address": address,
+      "note": "note",
 
     });
 

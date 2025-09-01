@@ -2,23 +2,18 @@ import 'dart:async';
 import 'dart:developer';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:geocoding/geocoding.dart';
-
 import 'package:geolocator/geolocator.dart' as geo;
 import 'package:intl/intl.dart';
 
-import '../../../core/utils/snackbar_utils.dart';
-
 class LocationProvider with ChangeNotifier {
   geo.Position? _lastPosition;
-  DateTime? _lastMovementTime;
+  DateTime? _lastLogTime;
   StreamSubscription<geo.Position>? _positionStream;
-
-  Timer? _testTimer; // 🔹 new timer
 
   bool _isTracking = false;
   String? _userId;
-  bool _isIdle = false; // Track idle state
 
   bool get isTracking => _isTracking;
 
@@ -33,21 +28,14 @@ class LocationProvider with ChangeNotifier {
     }
 
     _isTracking = true;
-    _lastMovementTime = DateTime.now();
+    _lastLogTime = DateTime.now();
 
     _positionStream = geo.Geolocator.getPositionStream(
       locationSettings: const geo.LocationSettings(
         accuracy: geo.LocationAccuracy.high,
-        distanceFilter: 50, // check every 50 meters
+        distanceFilter: 10, // 🔹 small so we can detect 300m properly
       ),
     ).listen((pos) => _handlePosition(pos, context));
-
-/*    // 🔹 TEST MODE: show log every 5 seconds
-    _testTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
-      if (_lastPosition != null) {
-        await _saveLog(_lastPosition!, "5-sec test log", context);
-      }
-    });*/
 
     notifyListeners();
   }
@@ -56,18 +44,16 @@ class LocationProvider with ChangeNotifier {
   Future<void> stopTracking() async {
     await _positionStream?.cancel();
     _isTracking = false;
-    _isIdle = false;
     notifyListeners();
   }
 
-  Future<void> _handlePosition(
-      geo.Position pos, BuildContext context) async {
+  Future<void> _handlePosition(geo.Position pos, BuildContext context) async {
     final now = DateTime.now();
 
     if (_lastPosition == null) {
       _lastPosition = pos;
-      _lastMovementTime = now;
-      await _saveLog(pos, "Movement start", context);
+      _lastLogTime = now;
+      await _saveLog(pos, "start", context);
       return;
     }
 
@@ -78,37 +64,21 @@ class LocationProvider with ChangeNotifier {
       pos.longitude,
     );
 
-    // 🔹 If user was idle but now moved 300m → resume logging
-    if (_isIdle && distance >= 300) {
-      _isIdle = false;
+    // 🔹 log if moved 300m
+    if (distance >= 300) {
       _lastPosition = pos;
-      _lastMovementTime = now;
-      await _saveLog(pos, "Movement resumed after idle", context);
+      _lastLogTime = now;
+      // await _saveLog(pos, "Moved ${distance.toStringAsFixed(1)} m", context);
+      await _saveLog(pos, "moving", context);
       return;
     }
 
-    // 🔹 Every 2 min OR 300m log
-    if (distance >= 300 ||
-        now.difference(_lastMovementTime!).inMinutes >= 2) {
-      _lastMovementTime = now;
+    // 🔹 log if 2 min passed
+    if (now.difference(_lastLogTime!).inMinutes >= 2) {
       _lastPosition = pos;
-      await _saveLog(pos, "Periodic log (moved $distance m)", context);
-    }
-
-    // 🔹 NEW: show snackbar/log every 30 seconds testing
-/*    _testTimer?.cancel(); // clear old if any
-    _testTimer = Timer.periodic(const Duration(seconds: 30), (timer) async {
-      if (_lastPosition != null && !_isIdle) {
-        await _saveLog(_lastPosition!, "30-sec periodic log", context);
-      }
-    });*/
-
-    // 🔹 If idle for 10 min
-    if (!_isIdle &&
-        distance < 50 &&
-        now.difference(_lastMovementTime!).inMinutes >= 10) {
-      _isIdle = true;
-      await _saveLog(pos, "User idle for 10 min → stop logging", context);
+      _lastLogTime = now;
+      // await _saveLog(pos, "Periodic log (2 min)", context);
+      await _saveLog(pos, "stationary", context);
     }
   }
 
@@ -123,57 +93,41 @@ class LocationProvider with ChangeNotifier {
       if (placemarks.isNotEmpty) {
         final p = placemarks.first;
         address = "${p.street}, ${p.locality}, ${p.country}";
-        print('address live tracking :: $address');
       }
     } catch (e) {
       log("Error fetching address: $e");
     }
 
-    // ✅ Snackbar every log
-    SnackBarUtils.showSuccess(context, 'Note: $note\nAddress: $address');
+    // ✅ Toast every log
+    Fluttertoast.showToast(
+      msg: "Log: $note\nLat: ${pos.latitude}, Lng: ${pos.longitude}\n$address",
+      toastLength: Toast.LENGTH_SHORT,
+    );
 
-    if (!_isIdle) {
-      await FirebaseFirestore.instance
-          .collection("user_location_history")
-          .doc(_userId)
-          .collection("routes")
-          .add({
-        "added": formatDateTime(DateTime.timestamp()),
-        "device_time": DateTime.now().toIso8601String(),
-        "latitude": pos.latitude,
-        "longitude": pos.longitude,
-        "status" : "active",
-        "timestamp" : Timestamp.now()
-        // "address": address,
-        // "note": note,
-
-      });
-
-
-/*      await FirebaseFirestore.instance
-          .collection("users")
-          .doc(_userId)
-          .collection("location_track_history")
-          .add({
-        "lat": pos.latitude,
-        "long": pos.longitude,
-        "address": address,
-        "time": DateTime.now().toIso8601String(),
-        "note": note,
-      });*/
-
-    }
+    // ✅ Firestore logging
+    await FirebaseFirestore.instance
+        .collection("user_location_history")
+        .doc("1")
+        .collection("routes")
+        .add({
+      "added": formatDateTime(DateTime.now()),
+      "device_time": DateTime.now().toIso8601String(),
+      "latitude": pos.latitude,
+      "longitude": pos.longitude,
+      "status": "active",
+      "timestamp": DateTime.now().millisecondsSinceEpoch,
+      "address": address,
+      "note": note,
+    });
   }
 
   String formatDateTime(DateTime dateTime) {
-    // Example: August 19, 2025 at 6:37:13 PM UTC+5:30
-    final dateFormat = DateFormat('MMMM d, y'); // August 19, 2025
-    final timeFormat = DateFormat('h:mm:ss a'); // 6:37:13 PM
+    final dateFormat = DateFormat('MMMM d, y');
+    final timeFormat = DateFormat('h:mm:ss a');
 
     String formattedDate = dateFormat.format(dateTime);
     String formattedTime = timeFormat.format(dateTime);
 
-    // Timezone offset
     String timeZone = dateTime.timeZoneOffset.isNegative ? '-' : '+';
     String twoDigits(int n) => n.toString().padLeft(2, '0');
     final hours = twoDigits(dateTime.timeZoneOffset.inHours.abs());
@@ -181,7 +135,4 @@ class LocationProvider with ChangeNotifier {
 
     return '$formattedDate at $formattedTime UTC$timeZone$hours:$minutes';
   }
-
 }
-
-
