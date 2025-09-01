@@ -11,11 +11,15 @@ class LocationProvider with ChangeNotifier {
   geo.Position? _lastPosition;
   DateTime? _lastLogTime;
   StreamSubscription<geo.Position>? _positionStream;
+  Timer? _timer; // ✅ Added timer
 
   bool _isTracking = false;
   String? _userId;
 
   bool get isTracking => _isTracking;
+
+  DateTime? _lastMovementTime;
+  bool _isStopped = false;
 
   /// Start tracking
   Future<void> startTracking(String userId, BuildContext context) async {
@@ -33,9 +37,19 @@ class LocationProvider with ChangeNotifier {
     _positionStream = geo.Geolocator.getPositionStream(
       locationSettings: const geo.LocationSettings(
         accuracy: geo.LocationAccuracy.high,
-        distanceFilter: 10, // 🔹 small so we can detect 300m properly
+        // distanceFilter: 10,
+        distanceFilter: 0,
       ),
     ).listen((pos) => _handlePosition(pos, context));
+
+    // ✅ Timer to ensure logging even if no GPS update comes
+    _timer = Timer.periodic(const Duration(minutes: 1), (timer) async {
+      if (_lastPosition != null &&
+          DateTime.now().difference(_lastLogTime!).inMinutes >= 2) {
+        _lastLogTime = DateTime.now();
+        await _saveLog(_lastPosition!, "stationary", context);
+      }
+    });
 
     notifyListeners();
   }
@@ -43,6 +57,7 @@ class LocationProvider with ChangeNotifier {
   /// Stop tracking
   Future<void> stopTracking() async {
     await _positionStream?.cancel();
+    _timer?.cancel(); // ✅ stop timer
     _isTracking = false;
     notifyListeners();
   }
@@ -53,6 +68,9 @@ class LocationProvider with ChangeNotifier {
     if (_lastPosition == null) {
       _lastPosition = pos;
       _lastLogTime = now;
+      _lastMovementTime = now;
+      _isStopped = false; // initially tracking active
+
       await _saveLog(pos, "start", context);
       return;
     }
@@ -68,18 +86,24 @@ class LocationProvider with ChangeNotifier {
     if (distance >= 300) {
       _lastPosition = pos;
       _lastLogTime = now;
-      // await _saveLog(pos, "Moved ${distance.toStringAsFixed(1)} m", context);
-      await _saveLog(pos, "moving", context);
+      _lastMovementTime = now;
+
+      if (_isStopped) {
+        // पहले stop था, अब दुबारा start करना है
+        _isStopped = false;
+        await _saveLog(pos, "start", context);
+      } else {
+        await _saveLog(pos, "moving", context);
+      }
+    }
+
+    // ✅ अगर 10 min तक movement नहीं हुई
+    if (!_isStopped && now.difference(_lastMovementTime!).inMinutes >= 10) {
+      _isStopped = true;
+      await _saveLog(pos, "stop", context);
       return;
     }
 
-    // 🔹 log if 2 min passed
-    if (now.difference(_lastLogTime!).inMinutes >= 2) {
-      _lastPosition = pos;
-      _lastLogTime = now;
-      // await _saveLog(pos, "Periodic log (2 min)", context);
-      await _saveLog(pos, "stationary", context);
-    }
   }
 
   Future<void> _saveLog(
