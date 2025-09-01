@@ -5,8 +5,15 @@ import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart' as geo;
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+
+import '../../../providers/user_provider.dart';
 
 class LocationService {
+
+  String? userId;
+
   static Future<void> initializeService() async {
     final service = FlutterBackgroundService();
 
@@ -59,13 +66,13 @@ void onStart(ServiceInstance service) {
     }
 
     // ✅ Toast works in background
-    Fluttertoast.showToast(
+/*    Fluttertoast.showToast(
       msg: "BG Log: ${pos.latitude}, ${pos.longitude}\n$address",
       toastLength: Toast.LENGTH_SHORT,
-    );
+    );*/
 
     // ✅ Firestore logging
-    await FirebaseFirestore.instance
+/*    await FirebaseFirestore.instance
         .collection("users")
         .doc("test_user") // replace with actual userId
         .collection("location_track_history")
@@ -75,7 +82,46 @@ void onStart(ServiceInstance service) {
       "address": address,
       "time": DateTime.now().toIso8601String(),
       "note": "Background log",
+    });*/
+    // final userProvider = Provider.of<UserProvider>(context, listen: false);
+    // var userId = userProvider.user?.data.id.toString();
+
+    await FirebaseFirestore.instance
+        .collection("user_location_history")
+        .doc("1")
+        .collection("routes")
+        .add({
+      "added": formatDateTime(DateTime.timestamp()),
+      "device_time": DateTime.now().toIso8601String(),
+      "latitude": pos.latitude,
+      "longitude": pos.longitude,
+      "status" : "active",
+      "timestamp" : DateTime.now().millisecondsSinceEpoch
+      // "address": address,
+      // "note": note,
+
     });
+
   });
+
+
 }
+
+String formatDateTime(DateTime dateTime) {
+  // Example: August 19, 2025 at 6:37:13 PM UTC+5:30
+  final dateFormat = DateFormat('MMMM d, y'); // August 19, 2025
+  final timeFormat = DateFormat('h:mm:ss a'); // 6:37:13 PM
+
+  String formattedDate = dateFormat.format(dateTime);
+  String formattedTime = timeFormat.format(dateTime);
+
+  // Timezone offset
+  String timeZone = dateTime.timeZoneOffset.isNegative ? '-' : '+';
+  String twoDigits(int n) => n.toString().padLeft(2, '0');
+  final hours = twoDigits(dateTime.timeZoneOffset.inHours.abs());
+  final minutes = twoDigits(dateTime.timeZoneOffset.inMinutes.remainder(60));
+
+  return '$formattedDate at $formattedTime UTC$timeZone$hours:$minutes';
+}
+
 

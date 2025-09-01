@@ -1,6 +1,8 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:nutanvij_electricals/screens/home/home_screen.dart';
 import 'package:nutanvij_electricals/screens/home/providers/location_provider.dart';
 import 'package:nutanvij_electricals/screens/hrms/providers/all_user_route_provider.dart';
@@ -48,6 +50,16 @@ void main() async{
     _handleNotificationNavigation(initialMessage);
   }
   await LocationService.initializeService();
+
+  final service = FlutterBackgroundService();
+  service.on("show_toast").listen((event) {
+    if (event != null) {
+      Fluttertoast.showToast(
+        msg: "BG Log: ${event["lat"]}, ${event["long"]}\n${event["address"]}",
+        toastLength: Toast.LENGTH_SHORT,
+      );
+    }
+  });
 
   runApp(const MyApp());
 }

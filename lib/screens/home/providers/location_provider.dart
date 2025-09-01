@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 
 import 'package:geolocator/geolocator.dart' as geo;
+import 'package:intl/intl.dart';
 
 import '../../../core/utils/snackbar_utils.dart';
 
@@ -133,6 +134,23 @@ class LocationProvider with ChangeNotifier {
 
     if (!_isIdle) {
       await FirebaseFirestore.instance
+          .collection("user_location_history")
+          .doc(_userId)
+          .collection("routes")
+          .add({
+        "added": formatDateTime(DateTime.timestamp()),
+        "device_time": DateTime.now().toIso8601String(),
+        "latitude": pos.latitude,
+        "longitude": pos.longitude,
+        "status" : "active",
+        "timestamp" : Timestamp.now()
+        // "address": address,
+        // "note": note,
+
+      });
+
+
+/*      await FirebaseFirestore.instance
           .collection("users")
           .doc(_userId)
           .collection("location_track_history")
@@ -142,9 +160,28 @@ class LocationProvider with ChangeNotifier {
         "address": address,
         "time": DateTime.now().toIso8601String(),
         "note": note,
-      });
+      });*/
+
     }
   }
+
+  String formatDateTime(DateTime dateTime) {
+    // Example: August 19, 2025 at 6:37:13 PM UTC+5:30
+    final dateFormat = DateFormat('MMMM d, y'); // August 19, 2025
+    final timeFormat = DateFormat('h:mm:ss a'); // 6:37:13 PM
+
+    String formattedDate = dateFormat.format(dateTime);
+    String formattedTime = timeFormat.format(dateTime);
+
+    // Timezone offset
+    String timeZone = dateTime.timeZoneOffset.isNegative ? '-' : '+';
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final hours = twoDigits(dateTime.timeZoneOffset.inHours.abs());
+    final minutes = twoDigits(dateTime.timeZoneOffset.inMinutes.remainder(60));
+
+    return '$formattedDate at $formattedTime UTC$timeZone$hours:$minutes';
+  }
+
 }
 
 

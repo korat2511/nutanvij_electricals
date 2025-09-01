@@ -56,14 +56,18 @@ class _RouteScreenState extends State<RouteScreen> {
       final userId = userProvider.user?.data.id.toString();
       if (userId == null) return;
 
+      //TODO
+
       final snapshot = await FirebaseFirestore.instance
           .collection('user_location_history')
           .doc(userId)
+          // .doc("156")
           .collection('routes')
           .orderBy('timestamp', descending: true)
           .get();
 
       //TODO
+
 /*
       final snapshot = await FirebaseFirestore.instance
           .collection('users')
@@ -72,6 +76,7 @@ class _RouteScreenState extends State<RouteScreen> {
           .orderBy('time', descending: true)
           .get();
 */
+
 
       final locations = snapshot.docs.map((doc) {
         final data = doc.data();
@@ -123,8 +128,8 @@ class _RouteScreenState extends State<RouteScreen> {
       for (var i = 0; i < locations.length; i++) {
         final location = locations[i];
         try {
-          final lat = _parseDouble(location['latitude']) ?? defaultLat;
-          final lng = _parseDouble(location['longitude']) ?? defaultLng;
+          final lat = _parseDouble(location['lat']) ?? defaultLat;
+          final lng = _parseDouble(location['long']) ?? defaultLng;
           final position = LatLng(lat, lng);
           points.add(position);
           markers.add(
@@ -134,10 +139,10 @@ class _RouteScreenState extends State<RouteScreen> {
               infoWindow: InfoWindow(
                 title: '${location['event_type']}',
                 snippet: DateFormat('hh:mm a').format(
-                  DateTime.fromMillisecondsSinceEpoch(location['timestamp']
+                  DateTime.fromMillisecondsSinceEpoch(location['time']
                           is int
                       ? location['timestamp']
-                      : int.tryParse(location['timestamp'].toString()) ?? 0),
+                      : int.tryParse(location['time'].toString()) ?? 0),
                 ),
               ),
             ),
@@ -431,7 +436,8 @@ class _RouteScreenState extends State<RouteScreen> {
 
     return Column(
       children: [
-        Padding(
+        //TODO
+/*        Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -441,7 +447,7 @@ class _RouteScreenState extends State<RouteScreen> {
               _statItem('Car', '$carKm km'),
             ],
           ),
-        ),
+        ),*/
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           child: Row(

@@ -120,9 +120,9 @@ class _AllUserRouteScreenState extends State<AllUserRouteScreen> {
                     return GestureDetector(
                       onTap: (){
                         //go to map screen
-/*                        NavigationUtils.push(
+                        NavigationUtils.push(
                             context,
-                            const RouteScreen());*/
+                            const RouteScreen());
                       },
                       child: Card(
                         color: Colors.white,

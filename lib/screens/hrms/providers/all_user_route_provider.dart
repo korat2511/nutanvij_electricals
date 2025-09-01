@@ -24,7 +24,7 @@ class AllUserRouteProvider with ChangeNotifier {
   /// Fetch Users
   Future<void> fetchUsers(BuildContext context, UserProvider userProvider) async {
     _isLoadingUsers = true;
-    notifyListeners();
+    if (hasListeners) notifyListeners();
 
     try {
       final user = userProvider.user;
