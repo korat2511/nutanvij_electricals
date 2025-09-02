@@ -137,7 +137,8 @@ class _RouteScreenState extends State<RouteScreen> {
               markerId: MarkerId('${location['id']}'),
               position: position,
               infoWindow: InfoWindow(
-                title: '${location['event_type']}',
+                // title: '${location['event_type']}',
+                title: '${location['note']}',
                 snippet: DateFormat('hh:mm a').format(
                   DateTime.fromMillisecondsSinceEpoch(location['time']
                           is int
@@ -223,8 +224,10 @@ class _RouteScreenState extends State<RouteScreen> {
       try {
         final lat = _parseDouble(location['latitude']) ?? defaultLat;
         final lng = _parseDouble(location['longitude']) ?? defaultLng;
+/*        final eventType =
+            (location['event_type'] ?? '').toString().toLowerCase();*/
         final eventType =
-            (location['event_type'] ?? '').toString().toLowerCase();
+            (location['note'] ?? '').toString().toLowerCase();
         final markerColor = _getMarkerColorForEvent(eventType);
         final markerIcon = BitmapDescriptor.defaultMarkerWithHue(markerColor);
         markers.add(
@@ -398,7 +401,8 @@ class _RouteScreenState extends State<RouteScreen> {
 
     // Number of stops
     final numStops = filteredLocations.where((loc) {
-      final type = (loc['event_type'] ?? '').toString().toLowerCase();
+      // final type = (loc['event_type'] ?? '').toString().toLowerCase();
+      final type = (loc['note'] ?? '').toString().toLowerCase();
       return type == 'stop';
     }).length;
 
@@ -562,8 +566,10 @@ class _RouteScreenState extends State<RouteScreen> {
                   );
                   final lat = _parseDouble(location['latitude']) ?? defaultLat;
                   final lng = _parseDouble(location['longitude']) ?? defaultLng;
+/*                  final eventType =
+                      (location['event_type'] ?? '').toString().toLowerCase();*/
                   final eventType =
-                      (location['event_type'] ?? '').toString().toLowerCase();
+                      (location['note'] ?? '').toString().toLowerCase();
                   final color = _getMarkerColorForEvent(eventType);
                   return TimelineTile(
                     alignment: TimelineAlign.manual,
@@ -575,7 +581,8 @@ class _RouteScreenState extends State<RouteScreen> {
                       color: HSVColor.fromAHSV(1, color, 1, 1).toColor(),
                       iconStyle: IconStyle(
                         color: Colors.white,
-                        iconData: _getIconForEventType(location['event_type']),
+                        // iconData: _getIconForEventType(location['event_type']),
+                        iconData: _getIconForEventType(location['note']),
                       ),
                     ),
                     beforeLineStyle: LineStyle(
@@ -594,7 +601,8 @@ class _RouteScreenState extends State<RouteScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '${location['event_type']}',
+                            // '${location['event_type']}',
+                            '${location['note']}',
                             style: AppTypography.bodySmall,
                           ),
                           const SizedBox(height: 4),
