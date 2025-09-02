@@ -49,7 +49,7 @@ void main() async{
     print('App opened from terminated state: ${initialMessage.data}');
     _handleNotificationNavigation(initialMessage);
   }
-  // await LocationService.initializeService();
+  await LocationService.initializeService();
 
   final service = FlutterBackgroundService();
   service.on("show_toast").listen((event) {

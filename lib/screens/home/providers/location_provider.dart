@@ -43,7 +43,7 @@ class LocationProvider with ChangeNotifier {
     ).listen((pos) => _handlePosition(pos, context));
 
     // ✅ Timer to ensure logging even if no GPS update comes
-    _timer = Timer.periodic(const Duration(minutes: 1), (timer) async {
+    _timer = Timer.periodic(const Duration(minutes: 2), (timer) async {
       if (_lastPosition != null &&
           DateTime.now().difference(_lastLogTime!).inMinutes >= 2) {
         _lastLogTime = DateTime.now();
@@ -80,6 +80,11 @@ class LocationProvider with ChangeNotifier {
       _lastPosition!.longitude,
       pos.latitude,
       pos.longitude,
+    );
+
+    Fluttertoast.showToast(
+      msg: "Distance : $distance",
+      toastLength: Toast.LENGTH_SHORT,
     );
 
     // 🔹 log if moved 300m
@@ -131,7 +136,7 @@ class LocationProvider with ChangeNotifier {
     // ✅ Firestore logging
     await FirebaseFirestore.instance
         .collection("user_location_history")
-        .doc("1")
+        .doc(_userId)
         .collection("routes")
         .add({
       "added": formatDateTime(DateTime.now()),

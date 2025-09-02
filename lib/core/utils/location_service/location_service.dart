@@ -6,14 +6,8 @@ import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart' as geo;
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
-import 'package:provider/provider.dart';
-
-import '../../../providers/user_provider.dart';
 
 class LocationService {
-
-  String? userId;
-
   static Future<void> initializeService() async {
     final service = FlutterBackgroundService();
 
@@ -33,89 +27,108 @@ class LocationService {
       ),
     );
 
-
     service.startService();
   }
 
   static Future<bool> onIosBackground(ServiceInstance service) async {
     return true;
   }
-
 }
 
 @pragma('vm:entry-point')
 void onStart(ServiceInstance service) {
   geo.Geolocator.requestPermission();
 
+  geo.Position? lastPosition;
+  DateTime? lastMovementTime;
+  bool isStopped = false;
+
   geo.Geolocator.getPositionStream(
     locationSettings: const geo.LocationSettings(
       accuracy: geo.LocationAccuracy.high,
-      distanceFilter: 50,
+      distanceFilter: 0, // we’ll handle distance manually
     ),
   ).listen((pos) async {
-    String address = "Unknown";
-    try {
-      final placemarks =
-      await placemarkFromCoordinates(pos.latitude, pos.longitude);
-      if (placemarks.isNotEmpty) {
-        final p = placemarks.first;
-        address = "${p.street}, ${p.locality}, ${p.country}";
-      }
-    } catch (e) {
-      log("Address error: $e");
+    final now = DateTime.now();
+
+    if (lastPosition == null) {
+      lastPosition = pos;
+      lastMovementTime = now;
+      isStopped = false;
+      await _saveLog(pos, "start");
+      return;
     }
 
-    // ✅ Toast works in background
-/*    Fluttertoast.showToast(
-      msg: "BG Log: ${pos.latitude}, ${pos.longitude}\n$address",
-      toastLength: Toast.LENGTH_SHORT,
-    );*/
+    final distance = geo.Geolocator.distanceBetween(
+      lastPosition!.latitude,
+      lastPosition!.longitude,
+      pos.latitude,
+      pos.longitude,
+    );
 
-    // ✅ Firestore logging
-/*    await FirebaseFirestore.instance
-        .collection("users")
-        .doc("test_user") // replace with actual userId
-        .collection("location_track_history")
-        .add({
-      "lat": pos.latitude,
-      "long": pos.longitude,
-      "address": address,
-      "time": DateTime.now().toIso8601String(),
-      "note": "Background log",
-    });*/
-    // final userProvider = Provider.of<UserProvider>(context, listen: false);
-    // var userId = userProvider.user?.data.id.toString();
+    // 🔹 log if moved 300m+
+    if (distance >= 300) {
+      lastPosition = pos;
+      lastMovementTime = now;
 
-    await FirebaseFirestore.instance
-        .collection("user_location_history")
-        .doc("1")
-        .collection("routes")
-        .add({
-      "added": formatDateTime(DateTime.timestamp()),
-      "device_time": DateTime.now().toIso8601String(),
-      "latitude": pos.latitude,
-      "longitude": pos.longitude,
-      "status" : "active",
-      "timestamp" : DateTime.now().millisecondsSinceEpoch,
-      "address": address,
-      "note": "note",
+      if (isStopped) {
+        isStopped = false;
+        await _saveLog(pos, "start");
+      } else {
+        await _saveLog(pos, "moving");
+      }
+    }
 
-    });
-
+    // ✅ if idle for 10 min
+    if (!isStopped && now.difference(lastMovementTime!).inMinutes >= 10) {
+      isStopped = true;
+      await _saveLog(pos, "stop");
+    }
   });
+}
 
+Future<void> _saveLog(geo.Position pos, String note) async {
+  String address = "Unknown";
+  try {
+    final placemarks = await placemarkFromCoordinates(pos.latitude, pos.longitude);
+    if (placemarks.isNotEmpty) {
+      final p = placemarks.first;
+      address = "${p.street}, ${p.locality}, ${p.country}";
+    }
+  } catch (e) {
+    log("Error fetching address: $e");
+  }
 
+  // ✅ Toast (works in foreground, may not show in background on all devices)
+  Fluttertoast.showToast(
+    msg: "[$note] Lat: ${pos.latitude}, Lng: ${pos.longitude}\n$address",
+    toastLength: Toast.LENGTH_SHORT,
+  );
+
+  // ✅ Firestore log
+  await FirebaseFirestore.instance
+      .collection("user_location_history")
+      .doc("1") // TODO: replace with actual userId
+      .collection("routes")
+      .add({
+    "added": formatDateTime(DateTime.now()),
+    "device_time": DateTime.now().toIso8601String(),
+    "latitude": pos.latitude,
+    "longitude": pos.longitude,
+    "status": "active",
+    "timestamp": DateTime.now().millisecondsSinceEpoch,
+    "address": address,
+    "note": note,
+  });
 }
 
 String formatDateTime(DateTime dateTime) {
-  // Example: August 19, 2025 at 6:37:13 PM UTC+5:30
-  final dateFormat = DateFormat('MMMM d, y'); // August 19, 2025
-  final timeFormat = DateFormat('h:mm:ss a'); // 6:37:13 PM
+  final dateFormat = DateFormat('MMMM d, y');
+  final timeFormat = DateFormat('h:mm:ss a');
 
   String formattedDate = dateFormat.format(dateTime);
   String formattedTime = timeFormat.format(dateTime);
 
-  // Timezone offset
   String timeZone = dateTime.timeZoneOffset.isNegative ? '-' : '+';
   String twoDigits(int n) => n.toString().padLeft(2, '0');
   final hours = twoDigits(dateTime.timeZoneOffset.inHours.abs());
@@ -123,5 +136,3 @@ String formatDateTime(DateTime dateTime) {
 
   return '$formattedDate at $formattedTime UTC$timeZone$hours:$minutes';
 }
-
-
