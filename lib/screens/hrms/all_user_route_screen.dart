@@ -108,89 +108,92 @@ class _AllUserRouteScreenState extends State<AllUserRouteScreen> {
             ),
             const SizedBox(height: 16),
             if (allUserProvider.selectedUser != null)
-              Expanded(
-                child: allUserProvider.isLoadingLogs
-                    ? const Center(child: CircularProgressIndicator())
-                    : allUserProvider.locationLogs.isEmpty
-                    ? const Center(child: Text("No location logs found"))
-                    : ListView.builder(
-                  itemCount: allUserProvider.locationLogs.length,
-                  itemBuilder: (context, index) {
-                    final log = allUserProvider.locationLogs[index];
-                    return GestureDetector(
-                      onTap: (){
-                        //go to map screen
-                        NavigationUtils.push(
-                            context,
-                            const RouteScreen());
-                      },
-                      child: Card(
-                        color: Colors.white,
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(color: Colors.grey.shade200, width: 1),
-                        ),
-                        margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  const Icon(Icons.location_on,
-                                      color: AppColors.primary, size: 20),
-                                  const SizedBox(width: 6),
-                                  Expanded(
-                                    child: Text(
-                                      "Lat: ${log['lat']}, Lng: ${log['long']}",
-                                      style: AppTypography.bodyMedium.copyWith(
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.black87,
+              Visibility(
+                visible: false,
+                child: Expanded(
+                  child: allUserProvider.isLoadingLogs
+                      ? const Center(child: CircularProgressIndicator())
+                      : allUserProvider.locationLogs.isEmpty
+                      ? const Center(child: Text("No location logs found"))
+                      : ListView.builder(
+                    itemCount: allUserProvider.locationLogs.length,
+                    itemBuilder: (context, index) {
+                      final log = allUserProvider.locationLogs[index];
+                      return GestureDetector(
+                        onTap: (){
+                          //go to map screen
+                          NavigationUtils.push(
+                              context,
+                              const RouteScreen());
+                        },
+                        child: Card(
+                          color: Colors.white,
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(color: Colors.grey.shade200, width: 1),
+                          ),
+                          margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(Icons.location_on,
+                                        color: AppColors.primary, size: 20),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        "Lat: ${log['lat']}, Lng: ${log['long']}",
+                                        style: AppTypography.bodyMedium.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.black87,
+                                        ),
                                       ),
                                     ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  "Address: ${log['address']}",
+                                  style: AppTypography.bodySmall.copyWith(
+                                    color: Colors.grey.shade700,
                                   ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                "Address: ${log['address']}",
-                                style: AppTypography.bodySmall.copyWith(
-                                  color: Colors.grey.shade700,
                                 ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                "Note: ${log['note']}",
-                                style: AppTypography.bodySmall.copyWith(
-                                  color: AppColors.primary,
-                                  fontWeight: FontWeight.w500,
+                                const SizedBox(height: 2),
+                                Text(
+                                  "Note: ${log['note']}",
+                                  style: AppTypography.bodySmall.copyWith(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 2),
-                              Row(
-                                children: [
-                                  const Icon(Icons.access_time,
-                                      size: 14, color: Colors.grey),
-                                  const SizedBox(width: 4),
-                                  Expanded(
-                                    child: Text(
-                                      allUserProvider.formatLogTime(log['time']),
-                                      style: AppTypography.bodySmall.copyWith(
-                                        color: Colors.grey.shade600,
-                                        fontStyle: FontStyle.italic,
+                                const SizedBox(height: 2),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.access_time,
+                                        size: 14, color: Colors.grey),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: Text(
+                                        allUserProvider.formatLogTime(log['time']),
+                                        style: AppTypography.bodySmall.copyWith(
+                                          color: Colors.grey.shade600,
+                                          fontStyle: FontStyle.italic,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                            ],
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
               )
           ],

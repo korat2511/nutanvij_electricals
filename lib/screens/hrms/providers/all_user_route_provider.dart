@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/constants/user_access.dart';
+import '../../../core/utils/navigation_utils.dart';
 import '../../../core/utils/snackbar_utils.dart';
 import '../../../providers/user_provider.dart';
 import '../../../services/api_service.dart';
+import '../../route/route_screen.dart';
 
 class AllUserRouteProvider with ChangeNotifier {
   bool _isLoadingUsers = false;
@@ -91,6 +93,10 @@ class AllUserRouteProvider with ChangeNotifier {
       }).toList();
 
       _locationLogs = logs;
+
+      NavigationUtils.push(
+          context,
+          const RouteScreen());
     } catch (e) {
       SnackBarUtils.showError(context, "Error fetching logs: $e");
     } finally {
