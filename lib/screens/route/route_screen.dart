@@ -65,7 +65,7 @@ class _RouteScreenState extends State<RouteScreen> {
 
       final snapshot = await FirebaseFirestore.instance
           .collection('user_location_history')
-          .doc("2") // <-- replace with your userId
+          .doc(userId) // <-- replace with your userId TODO
           .collection('routes')
           .where('timestamp', isGreaterThanOrEqualTo: startOfDay.millisecondsSinceEpoch)
           .where('timestamp', isLessThan: endOfDay.millisecondsSinceEpoch)

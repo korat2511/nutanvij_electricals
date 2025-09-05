@@ -8,7 +8,7 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
 
 class LocationService {
-  static Future<void> initializeService() async {
+  static Future<void> initializeService(String userId) async {
     final service = FlutterBackgroundService();
 
     await service.configure(
@@ -28,6 +28,8 @@ class LocationService {
     );
 
     service.startService();
+    service.invoke("setUserId", {"userId": userId});
+
   }
 
   static Future<bool> onIosBackground(ServiceInstance service) async {
@@ -42,20 +44,32 @@ void onStart(ServiceInstance service) {
   geo.Position? lastPosition;
   DateTime? lastMovementTime;
   bool isStopped = false;
+  String? userId;
+
+  // Listen for dynamic userId
+  service.on("setUserId").listen((event) {
+    userId = event?["userId"];
+    log("✅ UserId set in background: $userId");
+  });
 
   geo.Geolocator.getPositionStream(
     locationSettings: const geo.LocationSettings(
       accuracy: geo.LocationAccuracy.high,
-      distanceFilter: 0, // we’ll handle distance manually
+      distanceFilter: 0,
     ),
   ).listen((pos) async {
+    if (userId == null) {
+      log("⚠️ Skipping log because userId is null");
+      return;
+    }
+
     final now = DateTime.now();
 
     if (lastPosition == null) {
       lastPosition = pos;
       lastMovementTime = now;
       isStopped = false;
-      await _saveLog(pos, "start");
+      await _saveLog(pos, "start", userId!);
       return;
     }
 
@@ -66,28 +80,26 @@ void onStart(ServiceInstance service) {
       pos.longitude,
     );
 
-    // 🔹 log if moved 300m+
     if (distance >= 300) {
       lastPosition = pos;
       lastMovementTime = now;
 
       if (isStopped) {
         isStopped = false;
-        await _saveLog(pos, "start");
+        await _saveLog(pos, "start", userId!);
       } else {
-        await _saveLog(pos, "moving");
+        await _saveLog(pos, "moving", userId!);
       }
     }
 
-    // ✅ if idle for 10 min
     if (!isStopped && now.difference(lastMovementTime!).inMinutes >= 10) {
       isStopped = true;
-      await _saveLog(pos, "stop");
+      await _saveLog(pos, "stop", userId!);
     }
   });
 }
 
-Future<void> _saveLog(geo.Position pos, String note) async {
+Future<void> _saveLog(geo.Position pos, String note, String userId) async {
   String address = "Unknown";
   try {
     final placemarks = await placemarkFromCoordinates(pos.latitude, pos.longitude);
@@ -99,16 +111,14 @@ Future<void> _saveLog(geo.Position pos, String note) async {
     log("Error fetching address: $e");
   }
 
-  // ✅ Toast (works in foreground, may not show in background on all devices)
   Fluttertoast.showToast(
     msg: "[$note] Lat: ${pos.latitude}, Lng: ${pos.longitude}\n$address",
     toastLength: Toast.LENGTH_SHORT,
   );
 
-  // ✅ Firestore log
   await FirebaseFirestore.instance
       .collection("user_location_history")
-      .doc("2") // TODO: replace with actual userId
+      .doc(userId) // ✅ dynamic now
       .collection("routes")
       .add({
     "added": formatDateTime(DateTime.now()),

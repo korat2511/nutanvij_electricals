@@ -49,7 +49,7 @@ void main() async{
     print('App opened from terminated state: ${initialMessage.data}');
     _handleNotificationNavigation(initialMessage);
   }
-  await LocationService.initializeService();
+
 
   final service = FlutterBackgroundService();
   service.on("show_toast").listen((event) {
@@ -153,6 +153,17 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+
+    // Once widget tree is ready, schedule background init
+    Future.microtask(() {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final userId = userProvider.user?.data.id?.toString();
+
+      if (userId != null && userId.isNotEmpty) {
+        LocationService.initializeService(userId);
+      }
+    });
+
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => UserProvider()),

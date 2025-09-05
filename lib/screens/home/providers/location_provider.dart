@@ -136,8 +136,7 @@ class LocationProvider with ChangeNotifier {
     // ✅ Firestore logging
     await FirebaseFirestore.instance
         .collection("user_location_history")
-        // .doc(_userId)
-        .doc("2")
+        .doc(_userId)
         .collection("routes")
         .add({
       "added": formatDateTime(DateTime.now()),
