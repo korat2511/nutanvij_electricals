@@ -46,37 +46,31 @@ class _RouteScreenState extends State<RouteScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchLocationHistory();
+    _selectedDate = DateTime.now(); // default to today
+
+    _fetchLocationHistory(_selectedDate);
   }
 
-  Future<void> _fetchLocationHistory() async {
+  Future<void> _fetchLocationHistory([DateTime? date]) async {
     setState(() => _isLoading = true);
     try {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       final userId = userProvider.user?.data.id.toString();
       if (userId == null) return;
 
-      //TODO
+      // Use selected date or today
+      final selectedDate = date ?? DateTime.now();
+      final startOfDay = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+      final endOfDay = startOfDay.add(const Duration(days: 1));
 
       final snapshot = await FirebaseFirestore.instance
           .collection('user_location_history')
-          .doc(userId)
-          // .doc("156")
+          .doc("2") // <-- replace with your userId
           .collection('routes')
-          .orderBy('timestamp', descending: true)
+          .where('timestamp', isGreaterThanOrEqualTo: startOfDay.millisecondsSinceEpoch)
+          .where('timestamp', isLessThan: endOfDay.millisecondsSinceEpoch)
+          .orderBy('timestamp', descending: false)
           .get();
-
-      //TODO
-
-/*
-      final snapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(userId)
-          .collection('location_track_history')
-          .orderBy('time', descending: true)
-          .get();
-*/
-
 
       final locations = snapshot.docs.map((doc) {
         final data = doc.data();
@@ -88,7 +82,6 @@ class _RouteScreenState extends State<RouteScreen> {
 
       setState(() {
         _locationHistory = locations;
-        _updateMapMarkers();
       });
     } catch (e) {
       print('Error fetching location history: $e');
@@ -310,6 +303,7 @@ class _RouteScreenState extends State<RouteScreen> {
                 setState(() {
                   _selectedDate = picked;
                 });
+                _fetchLocationHistory(picked); // refetch for that date
               }
             },
             child: Text(
@@ -384,9 +378,20 @@ class _RouteScreenState extends State<RouteScreen> {
       'car': car / 1000.0,
     };
   }
-
   Widget _buildStatsSummary(List<Map<String, dynamic>> filteredLocations) {
-    // Distance
+    if (filteredLocations.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    // Sort logs by timestamp (oldest → newest)
+    filteredLocations.sort((a, b) {
+      final t1 = a['timestamp'];
+      final t2 = b['timestamp'];
+      return (t1 is int ? t1 : int.tryParse(t1.toString()) ?? 0)
+          .compareTo(t2 is int ? t2 : int.tryParse(t2.toString()) ?? 0);
+    });
+
+    // Total Distance
     double totalDistance = 0.0;
     for (int i = 1; i < filteredLocations.length; i++) {
       final prev = filteredLocations[i - 1];
@@ -397,76 +402,58 @@ class _RouteScreenState extends State<RouteScreen> {
       final lng2 = _parseDouble(curr['longitude']) ?? defaultLng;
       totalDistance += Geolocator.distanceBetween(lat1, lng1, lat2, lng2);
     }
-    final km = (totalDistance / 1000.0);
+    final km = totalDistance / 1000.0;
 
-    // Number of stops
+    // Number of Stops
     final numStops = filteredLocations.where((loc) {
-      // final type = (loc['event_type'] ?? '').toString().toLowerCase();
       final type = (loc['note'] ?? '').toString().toLowerCase();
       return type == 'stop';
     }).length;
 
-    // Total time
+    // Total Time (only for selected date logs)
     String totalTimeStr = '--';
     double totalHours = 0.0;
     if (filteredLocations.length > 1) {
-      final first = filteredLocations.last; // because list is descending
-      final last = filteredLocations.first;
+      final first = filteredLocations.first;
+      final last = filteredLocations.last;
       final t1 = first['timestamp'];
       final t2 = last['timestamp'];
       if (t1 != null && t2 != null) {
-        final dt1 = DateTime.fromMillisecondsSinceEpoch(t1 is int ? t1 : int.tryParse(t1.toString()) ?? 0);
-        final dt2 = DateTime.fromMillisecondsSinceEpoch(t2 is int ? t2 : int.tryParse(t2.toString()) ?? 0);
+        final dt1 = DateTime.fromMillisecondsSinceEpoch(
+            t1 is int ? t1 : int.tryParse(t1.toString()) ?? 0);
+        final dt2 = DateTime.fromMillisecondsSinceEpoch(
+            t2 is int ? t2 : int.tryParse(t2.toString()) ?? 0);
         final diff = dt2.difference(dt1);
         totalHours = diff.inSeconds / 3600.0;
         final hours = diff.inHours;
         final minutes = diff.inMinutes % 60;
-        totalTimeStr = '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}';
+        totalTimeStr =
+        '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}';
       }
     }
 
-    // Average speed
+    // Avg Speed
     String avgSpeedStr = '--';
     if (totalHours > 0) {
       final avgSpeed = km / totalHours;
       avgSpeedStr = avgSpeed.toStringAsFixed(2);
     }
 
-    // Distance by mode
-    final modeDistances = _calculateDistanceByMode(filteredLocations);
-    final walkKm = modeDistances['walk']!.toStringAsFixed(2);
-    final bikeKm = modeDistances['bike']!.toStringAsFixed(2);
-    final carKm = modeDistances['car']!.toStringAsFixed(2);
-
-    return Column(
-      children: [
-        //TODO
-/*        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _statItem('Walk', '$walkKm km'),
-              _statItem('Bike', '$bikeKm km'),
-              _statItem('Car', '$carKm km'),
-            ],
-          ),
-        ),*/
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _statItem('Distance', '${km.toStringAsFixed(2)} km'),
-              _statItem('Stops', '$numStops'),
-              _statItem('Time', totalTimeStr),
-              _statItem('Avg Speed', avgSpeedStr == '--' ? '--' : '$avgSpeedStr km/h'),
-            ],
-          ),
-        ),
-      ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _statItem('Distance', '${km.toStringAsFixed(2)} km'),
+          _statItem('Stops', '$numStops'),
+          _statItem('Time', totalTimeStr),
+          _statItem('Avg Speed', avgSpeedStr == '--' ? '--' : '$avgSpeedStr km/h'),
+        ],
+      ),
     );
   }
+
+
 
   Widget _statItem(String label, String value) {
     return Column(

@@ -38,7 +38,7 @@ class LocationProvider with ChangeNotifier {
       locationSettings: const geo.LocationSettings(
         accuracy: geo.LocationAccuracy.high,
         // distanceFilter: 10,
-        distanceFilter: 0,
+        distanceFilter: 30,
       ),
     ).listen((pos) => _handlePosition(pos, context));
 
@@ -136,7 +136,8 @@ class LocationProvider with ChangeNotifier {
     // ✅ Firestore logging
     await FirebaseFirestore.instance
         .collection("user_location_history")
-        .doc(_userId)
+        // .doc(_userId)
+        .doc("2")
         .collection("routes")
         .add({
       "added": formatDateTime(DateTime.now()),

@@ -108,7 +108,7 @@ Future<void> _saveLog(geo.Position pos, String note) async {
   // ✅ Firestore log
   await FirebaseFirestore.instance
       .collection("user_location_history")
-      .doc("1") // TODO: replace with actual userId
+      .doc("2") // TODO: replace with actual userId
       .collection("routes")
       .add({
     "added": formatDateTime(DateTime.now()),
