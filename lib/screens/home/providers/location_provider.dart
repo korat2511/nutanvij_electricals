@@ -82,10 +82,10 @@ class LocationProvider with ChangeNotifier {
       pos.longitude,
     );
 
-    Fluttertoast.showToast(
+/*    Fluttertoast.showToast(
       msg: "Distance : $distance",
       toastLength: Toast.LENGTH_SHORT,
-    );
+    );*/
 
     // 🔹 log if moved 300m
     if (distance >= 300) {
@@ -128,10 +128,10 @@ class LocationProvider with ChangeNotifier {
     }
 
     // ✅ Toast every log
-    Fluttertoast.showToast(
+/*    Fluttertoast.showToast(
       msg: "Log: $note\nLat: ${pos.latitude}, Lng: ${pos.longitude}\n$address",
       toastLength: Toast.LENGTH_SHORT,
-    );
+    );*/
 
     // ✅ Firestore logging
     await FirebaseFirestore.instance

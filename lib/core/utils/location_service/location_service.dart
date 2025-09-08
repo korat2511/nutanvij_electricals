@@ -111,10 +111,10 @@ Future<void> _saveLog(geo.Position pos, String note, String userId) async {
     log("Error fetching address: $e");
   }
 
-  Fluttertoast.showToast(
+/*  Fluttertoast.showToast(
     msg: "[$note] Lat: ${pos.latitude}, Lng: ${pos.longitude}\n$address",
     toastLength: Toast.LENGTH_SHORT,
-  );
+  );*/
 
   await FirebaseFirestore.instance
       .collection("user_location_history")
